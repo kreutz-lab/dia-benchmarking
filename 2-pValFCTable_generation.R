@@ -42,58 +42,7 @@ getDfModel <- function(modus, df) {
 }
 
 #################################################################################
-# IMPUTATION
-
-impSeq2 <- function (x) {
-  if (is.data.frame(x)) {
-    x <- data.matrix(x)
-  } else if (!is.matrix(x)) {
-    x <- matrix(x, length(x), 1, dimnames = list(names(x), 
-                                                 deparse(substitute(x))))
-  }
-  xcall <- match.call()
-  n <- nrow(x)
-  p <- ncol(x)
-  isnanx = is.na(x) + 0
-  risnanx = apply(isnanx, 1, sum)
-  if (length(which(risnanx > 0)) == 0) 
-    return(x)
-  sortx <- sort.int(risnanx, index.return = TRUE)
-  sorth <- sort.int(sortx$ix, index.return = TRUE)
-  x = x[sortx$ix, ]
-  isnanx = is.na(x) + 0
-  risnanx = sortx$x
-  complobs = which(risnanx == 0)
-  misobs = which(risnanx != 0)
-  nmisobs = length(misobs)
-  ncomplobs = length(complobs)
-  for (inn in 1:nmisobs) {
-    # print(inn)
-    if (inn == 1) {
-      covx = cov(x[complobs, ])
-      mx = colMeans(x[complobs, ])
-    } else {
-      mxo = mx
-      mx = ((ncomplobs - 1) * mx + x[misobs[inn - 1], ])/ncomplobs
-      covx = (ncomplobs - 2)/(ncomplobs - 1) * covx + 1/(ncomplobs - 
-                                                           1) * as.matrix(x[misobs[inn - 1], ] - mx) %*% 
-        t(as.matrix(x[misobs[inn - 1], ] - mx)) + as.matrix(mxo - 
-                                                              mx) %*% t(as.matrix(mxo - mx))
-    }
-    if (p >= length(complobs) | matrixcalc::is.singular.matrix(covx)) { # added "| is.singular.matrix(covx)" due to problem with solve if covx is singular
-      icovx = solve(covx + 0.01 * diag(p))
-    } else {
-      icovx = solve(covx)
-    }
-    mvar = as.logical(isnanx[misobs[inn], ])
-    xo = x[misobs[inn], !mvar]
-    x[misobs[inn], mvar] = mx[mvar] - solve(icovx[mvar, mvar]) %*% 
-      icovx[mvar, !mvar] %*% as.matrix(xo - mx[!mvar])
-    complobs = c(complobs, misobs[inn])
-    ncomplobs = ncomplobs + 1
-  }
-  x[sorth$ix, ]
-}
+# SPARSITY REDUCTION
 
 getSparcityReducedDf <- function(modus, df) {
   if (modus == "NoSR"){
@@ -166,11 +115,6 @@ getStatTestResultDf <- function(modus, df) {
       stats.df <- data.frame(Protein = row.names(df), pValue = pValsBH)
     }
   }else if  (modus == "ttestPerm"){
-    # t-test mit Permutation-based FDR correction
-    # http://jtleek.com/genstats/inst/doc/03_14_P-values-and-Multiple-Testing.html
-    # library(qvalue)
-    # library(genefilter)
-    #set.seed(3333)
     r = 250
     groups.fac <- factor(groups)
     
@@ -250,122 +194,6 @@ getStatTestResultDf <- function(modus, df) {
 }
 
 #################################################################################
-getMetricsDependentOnpVal <- function(pVal, df2, y="Sens", nEcoli.pre=NA, nHuman.pre=NA){
-  
-  if (is.na(nEcoli.pre)){
-    totalEcoli <- nrow(df2[which(grepl("ECOLI", row.names(df2))),])
-    totalHuman <- nrow(df2[which(grepl("HUMAN", row.names(df2))),])
-  } else {
-    totalEcoli <- nEcoli.pre
-    totalHuman <- nHuman.pre
-  }
-  
-  TP <- nrow(df2[(df2$pValue<pVal) & grepl("ECOLI", row.names(df2)),])
-  FP <- nrow(df2[(df2$pValue<pVal) & grepl("HUMAN", row.names(df2)),])
-  oneMinusSpec <- FP/totalHuman
-  sens <- TP/totalEcoli
-  df2$True <- ifelse(grepl("ECOLI", row.names(df2)), "ECOLI", "HUMAN")
-  df2$Prediction <- ifelse(df2$pValue<pVal, "ECOLI", "HUMAN")
-  if (y == "Sens"){
-    resultLst <- list(oneMinusSpec, sens)
-  } else if (y == "Kappa"){
-    # Area Under Kappa (AUK) Curve
-    kappa <- psych::cohen.kappa(x=df2[colnames(df2) %in% c("True", "Prediction")])[["kappa"]]
-    resultLst <- list(oneMinusSpec, kappa)
-  } else if (y == "Recall"){
-    precision <-  TP/(TP+FP)
-    resultLst <- list(sens, precision)
-  }
-  return(resultLst)
-}
-
-getpValCurvedf <- function(stats.df, y="Sens", nEcoli.pre=NA, nHuman.pre=NA) {
-  row.names(stats.df) <- stats.df$Protein
-  stats.df.pVal <- stats.df[ , grep( "pValue|Protein", names(stats.df)) ]
-  if (is.na(nEcoli.pre)){
-    p.curve.lst <- lapply(seq(0, 1, by = 0.005), getMetricsDependentOnpVal, df2=stats.df.pVal, y=y)
-  } else {
-    p.curve.lst <- lapply(seq(0, 1, by = 0.005), getMetricsDependentOnpVal, df2=stats.df.pVal, y=y, 
-                          nEcoli.pre=nEcoli.pre, nHuman.pre=nHuman.pre)
-  }
-  
-  p.curve.df <- data.frame(matrix(unlist(p.curve.lst), nrow=length(p.curve.lst), byrow=T))
-  
-  if (y == "Sens"){
-    colnames(p.curve.df) <- c("1-Specificity", "Sensitivity")
-    if (nrow(p.curve.df[(p.curve.df$`1-Specificity`==0 & p.curve.df$Sensitivity == 0)==TRUE, ]) == 0){
-      p.curve.df <- rbind(c(0,0), p.curve.df)
-      colnames(p.curve.df) <- c("1-Specificity", "Sensitivity")
-    }
-  } else if (y == "Kappa") {
-    colnames(p.curve.df) <- c("1-Specificity", "CohensKappa")
-  } else if (y == "Recall"){
-    colnames(p.curve.df) <- c("Sensitivity", "Precision")
-    p.curve.df <- rbind(c(0,1), p.curve.df)
-    colnames(p.curve.df) <- c("Sensitivity", "Precision")
-  } else if (y == "SensRank"){
-  }
-  p.curve.df <- p.curve.df[complete.cases(p.curve.df), ]
-  return(p.curve.df)
-}
-
-getTPdependentOnFC <- function(top, df2){
-  df2.sorted <- df2[order(-abs(df2$log2FC)), ]
-  tops <-row.names(df2.sorted[1:top,])
-  numEcoli <- sum(grepl("ECOLI", tops))
-  return(list(top, numEcoli))
-}
-
-getTPdependentOnFCpValRanksum <- function(top, df2){
-  df2.sorted <- df2[order(df2$FCpValRanksum), ] # use no absolute value here
-  tops <-row.names(df2.sorted[1:top,])
-  numEcoli <- sum(grepl("ECOLI", tops))
-  return(list(top, numEcoli))
-}
-
-getFCROCdf <- function(stats.df) {
-  row.names(stats.df) <- stats.df$Protein
-  stats.df.log2FC <- stats.df[ , grep( "log2FC|Protein", names(stats.df)) ]
-  stats.df.log2FC.nonNA <- stats.df.log2FC[!is.na(stats.df.log2FC$log2FC),]
-  FC.roc.lst <- lapply(seq(nrow(stats.df.log2FC.nonNA)), getTPdependentOnFC, df2=stats.df.log2FC.nonNA)
-  FC.roc.df <- data.frame(matrix(unlist(FC.roc.lst), nrow=length(FC.roc.lst), byrow=T))
-  colnames(FC.roc.df) <- c("No. of all proteins", "No. of E.coli proteins")
-  return(FC.roc.df)
-}
-
-getFCpValRanksumROCdf <- function(stats.df) {
-  stats.df$FCpValRanksum <- rank(stats.df$pValue) + rank(-stats.df$log2FC)
-  row.names(stats.df) <- stats.df$Protein
-  stats.df.rank <- stats.df[ , grep( "FCpValRanksum|Protein", names(stats.df)) ]
-  stats.df.rank.nonNA <- stats.df.rank[!is.na(stats.df.rank$FCpValRanksum),]
-  FC.roc.lst <- lapply(seq(nrow(stats.df.rank.nonNA)), getTPdependentOnFCpValRanksum, df2=stats.df.rank.nonNA)
-  FC.roc.df <- data.frame(matrix(unlist(FC.roc.lst), nrow=length(FC.roc.lst), byrow=T))
-  colnames(FC.roc.df) <- c("No. of all proteins", "No. of E.coli proteins")
-  return(FC.roc.df)
-}
-
-plotRocs <- function(p.curve.df, FC.roc.df){
-  plt <- ggplot(data = p.curve.df, 
-                aes(x=`1-Specificity`, y= `Sensitivity`)) +
-    #ggtitle(comp) +
-    geom_line()  + theme_minimal()
-  ggsave(plt, filename = paste0("FDR.pdf"), width = 8, height = 6)
-  
-  plt <- ggplot(data = FC.roc.df, 
-                aes(x=`No. of all proteins`, y= `No. of E.coli proteins`)) +
-    #ggtitle(comp) +
-    labs(x ="Top Log2FC proteins") +
-    geom_line()  + theme_minimal()
-  ggsave(plt, filename = paste0("FC.pdf"), width = 8, height = 6)
-}
-
-rmse <- function(actual, predicted) {
-  sqrt(mean((actual - predicted)^2,na.rm = TRUE))
-}
-
-nrmse <- function(actual, predicted) {
-  sqrt(mean((actual - predicted)^2,na.rm = TRUE))/sd(actual, na.rm = TRUE)
-}
 
 # Kolmogorov-Smirnov Test, 
 # Returns percentage of significant samples when KS test was applied on single samples compared to all samples combined
@@ -374,72 +202,6 @@ kolSmirTestSignProp <- function(mtx) {
   cnt <- sum(pvals.mtx<0.05)
   signProportion <- cnt/length(pvals.mtx)
   return(signProportion)
-}
-
-getAUCAUKRecall <- function(stats.df, nEcoli.pre=NA, nHuman.pre=NA){
-  p.roc.df <- getpValCurvedf(stats.df, y="Sens", nEcoli.pre, nHuman.pre)
-  
-  p.auc <- tryCatch({
-    p.auc <- DescTools::AUC(p.roc.df$`1-Specificity`, p.roc.df$Sensitivity, subdivisions=1000)
-  }, error = function(error_condition) {
-    p.auc <- NA
-  })
-  
-  # - Area Under Kappa (AUK) Curve is computed by varying the value of the threshold and recording the Cohen’s kappa 
-  # and false positive rates for all possible thresholds. for highly class-imbalanced, or skewed,data sets.
-  # (x-axis FPR, y-axis Cohen's Kappa)
-  p.Kapparoc.df <- getpValCurvedf(stats.df, y="Kappa", nEcoli.pre, nHuman.pre) 
-  p.auk <- tryCatch({
-    p.auk <- DescTools::AUC(p.Kapparoc.df$`1-Specificity`, p.Kapparoc.df$CohensKappa, subdivisions=1000)
-  }, error = function(error_condition) {
-    # message(error_condition)
-    p.auk <- NA
-  })
-  
-  # - Area Under Precision Recall Curve (x-axis Recall, y-axis Precision), more sensitive to the improvements 
-  # for the positive class compared to ROC AUC.  One common scenario is a highly imbalanced dataset where the fraction of positive class, which we want to find, is small
-  p.PrecRecallroc.df <- getpValCurvedf(stats.df, y="Recall", nEcoli.pre, nHuman.pre)
-  p.PrecRecallauc <- tryCatch({
-    p.PrecRecallauc <- DescTools::AUC(p.PrecRecallroc.df$Sensitivity, p.PrecRecallroc.df$Precision, subdivisions=1000)
-  }, error = function(error_condition) {
-    # message(error_condition)
-    p.PrecRecallauc <- NA
-  })
-  
-  list(p.auc, p.auk, p.PrecRecallauc)
-}
-
-getFCauc <- function(stats.df, FCpValRanksum=FALSE) {
-  if(FCpValRanksum){
-    FC.roc.df <- getFCpValRanksumROCdf(stats.df)
-  } else{
-    FC.roc.df <- getFCROCdf(stats.df) 
-  }
-
-  fc.auc <- tryCatch({
-    fc.auc <- DescTools::AUC(FC.roc.df$`No. of all proteins`, FC.roc.df$`No. of E.coli proteins`, subdivisions=1000)/(max(FC.roc.df$`No. of all proteins`)* max(FC.roc.df$`No. of E.coli proteins`))
-  }, error = function(error_condition) {
-    # message(error_condition)
-    fc.auc <- NA
-  })
-  fc.auc
-}
-
-getRMSE <- function(stats.df, metric) {
-  stats.dfEcoli <- stats.df[grepl("ECOLI", stats.df$Protein), ]
-  stats.dfHuman <- stats.df[grepl("HUMAN", stats.df$Protein), ]
-  
-  if (metric == "rmse"){
-    Ecoli <- rmse(actual=stats.dfEcoli$log2FC, predicted=stats.dfEcoli$log2FCPredicted)
-    Human <- rmse(actual=stats.dfHuman$log2FC, predicted=stats.dfHuman$log2FCPredicted)
-    HumanAndEcoli <- rmse(actual=stats.df$log2FC, predicted=stats.df$log2FCPredicted)
-    
-  } else if (metric == "nrmse"){
-    Ecoli <- nrmse(actual=stats.dfEcoli$log2FC, predicted=stats.dfEcoli$log2FCPredicted)
-    Human <- nrmse(actual=stats.dfHuman$log2FC, predicted=stats.dfHuman$log2FCPredicted)
-    HumanAndEcoli <- nrmse(actual=stats.df$log2FC, predicted=stats.df$log2FCPredicted)
-  }
-  list(Ecoli, Human, HumanAndEcoli)
 }
 
 runAnalysisForEachBootstrapSample <- function(df, dia, normalization, sparcityReduction, statTest,
@@ -455,7 +217,7 @@ runAnalysisForEachBootstrapSample <- function(df, dia, normalization, sparcityRe
   medianProteinVariance <- median(unname(apply(df, 1, var,  na.rm=TRUE)), na.rm = TRUE)
   KS.SignProp <- kolSmirTestSignProp(as.matrix(df))
   
-  percNATotal <- mean(is.na(df)) * 100 # With rows with only NAs removed before?
+  percNATotal <- mean(is.na(df)) * 100 
   percOfRowsWithNAs <- sum(apply(df, 1, anyNA))/nrow(df) * 100
   
   sparcRed.runtime <- system.time({ 
@@ -465,7 +227,6 @@ runAnalysisForEachBootstrapSample <- function(df, dia, normalization, sparcityRe
   
   normalization.runtime <- system.time({ 
     # Normalization
-    #print("Normalization")
     df <- getDfModel(normalization, df.sr)
   })
   
@@ -510,55 +271,6 @@ runAnalysisForEachBootstrapSample <- function(df, dia, normalization, sparcityRe
   })
   stats.df.intersectProtNames <- stats.df[intersectBoolIntersect, ]
   
-  AUCAUKRecallLst <- getAUCAUKRecall(stats.df, nEcoli.pre=NA, nHuman.pre=NA)
-  p.auc <- AUCAUKRecallLst[[1]]
-  p.auk <- AUCAUKRecallLst[[2]]
-  p.PrecRecallauc <- AUCAUKRecallLst[[3]]  
-  
-  AUCAUKRecallLst.pre <- getAUCAUKRecall(stats.df, nEcoli.pre=nEcoli.pre, nHuman.pre=nHuman.pre)
-  p.auc.pre <- AUCAUKRecallLst.pre[[1]]
-  p.auk.pre <- AUCAUKRecallLst.pre[[2]]
-  p.PrecRecallauc.pre <- AUCAUKRecallLst.pre[[3]]
-  
-  AUCAUKRecallLst.comb <- getAUCAUKRecall(stats.df.combProtNames, nEcoli.pre=nEcoli.comb, nHuman.pre=nHuman.comb)
-  p.auc.comb <- AUCAUKRecallLst.comb[[1]]
-  p.auk.comb <- AUCAUKRecallLst.comb[[2]]
-  p.PrecRecallauc.comb <- AUCAUKRecallLst.comb[[3]]
-  
-  AUCAUKRecallLst.intersect <- getAUCAUKRecall(stats.df.intersectProtNames, nEcoli.pre=nEcoli.intersect, nHuman.pre=nHuman.intersect)
-  p.auc.intersect <- AUCAUKRecallLst.intersect[[1]]
-  p.auk.intersect <- AUCAUKRecallLst.intersect[[2]]
-  p.PrecRecallauc.intersect <- AUCAUKRecallLst.intersect[[3]]
-  
-  fc.auc <- getFCauc(stats.df) 
-  fc.auc.intersectProtNames <- getFCauc(stats.df.intersectProtNames)
-  
-  # Calculate RMSE
-  
-  RMSEs <- getRMSE(stats.df, metric="rmse")
-  RMSEEcoli <- RMSEs[[1]]
-  RMSEHuman <- RMSEs[[2]]
-  RMSEHumanAndEcoli <- RMSEs[[3]]
-  
-  NRMSEs <- getRMSE(stats.df, metric="nrmse")
-  NRMSEEcoli <- NRMSEs[[1]]
-  NRMSEHuman <- NRMSEs[[2]]
-  NRMSEHumanAndEcoli <- NRMSEs[[3]]
-  
-  RMSEs.Intersect <- getRMSE(stats.df.intersectProtNames, metric="rmse")
-  RMSEEcoli.Intersect <- RMSEs.Intersect[[1]]
-  RMSEHuman.Intersect <- RMSEs.Intersect[[2]]
-  RMSEHumanAndEcoli.Intersect <- RMSEs.Intersect[[3]]
-  
-  NRMSEs.Intersect <- getRMSE(stats.df.intersectProtNames, metric="nrmse")
-  NRMSEEcoli.Intersect <- NRMSEs.Intersect[[1]]
-  NRMSEHuman.Intersect <- NRMSEs.Intersect[[2]]
-  NRMSEHumanAndEcoli.Intersect <- NRMSEs.Intersect[[3]]
-  
-  # AUC based on rank(stats.df$pValue) + rank(-stats.df$log2FC), x-axis "No. of all proteins", y-axis "No. of E.coli proteins"
-  fc.auc.FCpValRanksum <- getFCauc(stats.df, FCpValRanksum=TRUE) 
-  fc.auc.FCpValRanksum.intersectProtNames <- getFCauc(stats.df.intersectProtNames, FCpValRanksum=TRUE) 
-  
   nEcoli <- nrow(stats.df[which(grepl("ECOLI", stats.df$Protein)),])
   nHuman <- nrow(stats.df[which(grepl("HUMAN", stats.df$Protein)),])
   
@@ -566,17 +278,7 @@ runAnalysisForEachBootstrapSample <- function(df, dia, normalization, sparcityRe
                   nEcoliProteins=nEcoli, nHumanProteins=nHuman, nEcoliProteins.pre=nEcoli.pre, nHumanProteins.pre=nHuman.pre,
                   medianSampleVariance=medianSampleVariance, medianProteinVariance=medianProteinVariance, KS.SignProp=KS.SignProp, percNATotal=percNATotal, percOfRowsWithNAs=percOfRowsWithNAs,
                   sparcRed.runtime = sparcRed.runtime, normalization.runtime = normalization.runtime, statTest.runtime = statTest.runtime,
-                  seed.stat=seed.stat,
-                  p.auc=p.auc, p.auk=p.auk, p.PrecRecallauc=p.PrecRecallauc,
-                  p.auc.pre=p.auc.pre, p.auk.pre=p.auk.pre, p.PrecRecallauc.pre=p.PrecRecallauc.pre, 
-                  p.auc.comb=p.auc.comb, p.auk.comb=p.auk.comb, p.PrecRecallauc.comb=p.PrecRecallauc.comb, 
-                  p.auc.intersect=p.auc.intersect, p.auk.intersect=p.auk.intersect, p.PrecRecallauc.intersect=p.PrecRecallauc.intersect, 
-                  fc.auc=fc.auc, fc.auc.intersectProtNames=fc.auc.intersectProtNames,
-                  fc.auc.FCpValRanksum=fc.auc.FCpValRanksum, fc.auc.FCpValRanksum.intersectProtNames=fc.auc.FCpValRanksum.intersectProtNames,
-                  RMSEEcoli=RMSEEcoli, RMSEHuman=RMSEHuman, RMSEHumanAndEcoli=RMSEHumanAndEcoli,
-                  NRMSEEcoli=NRMSEEcoli, NRMSEHuman=NRMSEHuman, NRMSEHumanAndEcoli=NRMSEHumanAndEcoli,
-                  RMSEEcoli.Intersect=RMSEEcoli.Intersect, RMSEHuman.Intersect=RMSEHuman.Intersect, RMSEHumanAndEcoli.Intersect=RMSEHumanAndEcoli.Intersect,
-                  NRMSEEcoli.Intersect=NRMSEEcoli.Intersect, NRMSEHuman.Intersect=NRMSEHuman.Intersect, NRMSEHumanAndEcoli.Intersect=NRMSEHumanAndEcoli.Intersect)
+                  seed.stat=seed.stat)
   return(list(stats.df, summary))
 }
 
@@ -654,7 +356,6 @@ run <- function(batch, batch.size) {
     subresult.list <- lapply(repList, runAnalysisForEachBootstrapSample, dia=dia, 
                              normalization=normalization, sparcityReduction=sparcityReduction, statTest=statTest,
                              combinedProteinNames=combinedProteinNames, intersectProteinNames=intersectProteinNames)
-    
   }
   
   result.list2 <- unlist(result.list, recursive = FALSE)
@@ -665,17 +366,7 @@ run <- function(batch, batch.size) {
                            "nEcoliProteins", "nHumanProteins", "nEcoliProteins.pre", "nHumanProteins.pre", 
                            "medianSampleVariance", "medianProteinVariance", "KS.SignProp", "percNATotal", "percOfRowsWithNAs",
                            "sparcRed.runtime" , "normalization.runtime", "statTest.runtime",
-                           "seed.stat",
-                           "p.auc", "p.auk", "p.PrecRecallauc",
-                           "p.auc.pre", "p.auk.pre", "p.PrecRecallauc.pre", 
-                           "p.auc.comb", "p.auk.comb", "p.PrecRecallauc.comb", 
-                           "p.auc.intersect", "p.auk.intersect", "p.PrecRecallauc.intersect",
-                           "fc.auc", "fc.auc.intersectProtNames",
-                           "fc.auc.FCpValRanksum", "fc.auc.FCpValRanksum.intersectProtNames",
-                           "RMSEEcoli", "RMSEHuman", "RMSEHumanAndEcoli",
-                           "NRMSEEcoli", "NRMSEHuman", "NRMSEHumanAndEcoli",
-                           "RMSEEcoli.Intersect", "RMSEHuman.Intersect", "RMSEHumanAndEcoli.Intersect",
-                           "NRMSEEcoli.Intersect", "NRMSEHuman.Intersect", "NRMSEHumanAndEcoli.Intersect")
+                           "seed.stat")
   
   write.csv(result.df, file=paste0("benchmark_results_", batch, "_", batch.size, ".csv"), row.names = TRUE)
   save(result.list, file = paste0("resultlist_", batch,  "_", batch.size, ".Rdata"))
