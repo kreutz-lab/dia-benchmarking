@@ -7,4 +7,4 @@ Processing steps:
 3a) Partial AUC (pAUC) calculation based on p-values in result tables (3a_pAUC_calculation.R)\
 3b) Root Mean Square Error (RMSE) calculation based on log2(fold-change) in result tables (3b_RMSE_calculation.R)\
 3c) Calculation of additional data characteristics of bootstrap datasets (3c_additionalDataCharacteristics.R)\
-4\) Visualizations (4_visualizations.R)\
+4\) Visualizations (4_visualizations.R)
