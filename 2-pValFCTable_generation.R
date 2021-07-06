@@ -317,7 +317,7 @@ run <- function(batch, batch.size) {
             "DIANN_MaxQuant", "DIANN_DIANN_AI_GPF")
   normalizations <- c("unnormalized", "TRQN", "QN", "median")
   sparcityReductions <- c("NoSR", "SR66", "SR90")
-  statTests <- c("ttest", "limma", "LM", "GLMgamma", "Lasso", "SAM", "ROTS") # lm() is conducted in MSstats
+  statTests <- c("ttest", "limma", "GLMgamma", "SAM", "ROTS") 
   
   combs <- expand.grid(statTests, sparcityReductions, normalizations, dias)
   colnames(combs) <- c("statTest", "sparcityReduction", "normalization", "dia")
