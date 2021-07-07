@@ -1196,9 +1196,9 @@ for (eval.measure in eval.measures){
   dev.off()
   
   pdf(file = paste0("networkplot_", sett, "_",eval.measure,".pdf"), width = 20, height = 20)
-  df.combined.eval.wide %>% 
+  print(df.combined.eval.wide %>% 
     corrr::correlate() %>% 
-    corrr::network_plot()
+    corrr::network_plot())
   dev.off()
 }
 
