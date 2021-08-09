@@ -967,13 +967,36 @@ plotViolinPlotsCombSetting <- function(setting, df.combined, eval.measure) {
   ggplot.violin
 }
 
+plotViolinPlotsCombSettingHorizontal <- function(setting, df.combined, eval.measure) {
+  ggplot.violin <- ggplot(df.combined, aes(x = get(setting), y = get(eval.measure))) + 
+    xlab("") +
+    ylab(eval.measure) +
+    geom_violin(scale="count") +
+    geom_boxplot(width=0.08, outlier.size=0.5, outlier.alpha=0.4) +
+    geom_hline(aes(yintercept = median(get(eval.measure), na.rm = TRUE)), colour = 'red') +
+    theme(strip.placement = "outside", axis.text.x = element_text(angle = 55, hjust = 1))
+  
+  ggplot.violin
+}
+
+
+ggsave(filename="violinPlots_settingsCombined_statTest_statTest.runtime_horizontal.pdf", plot=plotViolinPlotsCombSettingHorizontal("statTest", df.combined, "statTest.runtime"), height = 3, width = 5)
+
 # FIGURE 4
 
 eval.measures <- c("p.pauc_0.8_correctFALSE.DiaWorkflowProteins", "p.pauc_0.8_correctFALSE.intersect", "p.pauc_0.8_correctFALSE.combined")
 
 for (eval.measure in eval.measures){
+  plotsSettings <- lapply(settings, plotViolinPlotsCombSettingHorizontal, df.combined=df.combined, eval.measure=eval.measure)
+  pdf(file = paste0("violinPlots_settingsCombined_horizontal_", eval.measure, ".pdf"), height = 5, width = 18)
+  print(cowplot::plot_grid(plotsSettings[[1]], plotsSettings[[2]], plotsSettings[[4]], plotsSettings[[3]], align = "h", nrow=1))
+  dev.off()
+}
+
+
+for (eval.measure in eval.measures){
   plotsSettings <- lapply(settings, plotViolinPlotsCombSetting, df.combined=df.combined, eval.measure=eval.measure)
-  pdf(file = paste0("Fig4CAndD_violinPlots_settingsCombined_", eval.measure, ".pdf"), height = 22, width = 5)
+  pdf(file = paste0("Fig4CAndD_violinPlots_settingsCombined_", eval.measure, ".pdf"), height = 22, width = 6)
   print(cowplot::plot_grid(plotsSettings[[1]], plotsSettings[[2]], plotsSettings[[4]], plotsSettings[[3]], align = "v", ncol=1))
   dev.off()
 }
@@ -1207,3 +1230,230 @@ sink("sessionInfo_visualizations.txt")
 print(session)
 sink()
 
+########################################################################
+# Ranking
+
+library(dplyr)
+
+
+df.combined2 <- df.combined
+df.combined2 <- addSoftwareLibraryColumns(df.combined2, sepSpace = TRUE)
+
+diaSpecifications <- c("dia", "diaSoftware", "diaLibrary")
+settings <- c("statTest", "sparsityReduction", "normalization")
+proteinLists <- c("DiaWorkflowProteins", "intersect", "combined")
+# ranks.statTest <- df.combined2 %>% 
+#   dplyr::group_by(X1, statTest, dia) %>% 
+#   summarise(mean.p.pauc_0.8_correctFALSE.DiaWorkflowProteins = mean(p.pauc_0.8_correctFALSE.DiaWorkflowProteins)) %>% 
+#   dplyr::group_by(X1, dia) %>%
+#   mutate(ranking = rank(- mean.p.pauc_0.8_correctFALSE.DiaWorkflowProteins)) %>% 
+#   dplyr::group_by(statTest, dia) %>% 
+#   summarise(mean.ranking = mean(ranking))
+
+
+for (setting in settings){
+  for (diaSpecification in diaSpecifications){
+    bump.lst <- list()
+    for (proteinList in proteinLists) {
+      ranks.df <- df.combined2 %>% 
+        dplyr::group_by(X1, !!as.name(setting), dia, diaSoftware, diaLibrary) %>% 
+        summarise(mean.pAUC = mean(!!as.name(paste0("p.pauc_0.8_correctFALSE.", proteinList)))) %>% 
+        dplyr::group_by(X1, dia) %>%
+        mutate(ranking = rank(- mean.pAUC)) %>% 
+        dplyr::group_by(!!as.name(setting), !!as.name(diaSpecification)) %>% 
+        summarise(mean.ranking = mean(ranking))
+      
+      bump.lst <- list.append(bump.lst, ranks.df)
+      
+      if (diaSpecification == "dia"){
+        width = 8
+      } else if (diaSpecification == "diaLibrary") {
+        width = 7
+      } else {
+        width = 7
+      }
+      
+      bump.chart <- ggplot(data = ranks.df, aes(x = get(setting), y = mean.ranking, group = get(diaSpecification), alpha=0.5)) +
+        geom_line(aes(color = get(diaSpecification)), size = 1) +
+        geom_point(aes(color = get(diaSpecification)), size = 2) +
+        scale_y_reverse(limits=c(length(unique(ranks.df[[setting]],0)), 1), breaks = 1:nrow(ranks.df)) +
+        ggtitle(paste0(diaSpecification, ", ", setting, ", ", proteinList)) +
+        theme(legend.title = element_blank()) +
+        # xlab(setting) +
+        xlab("") +
+        scale_alpha(guide = 'none') +
+        guides(colour = guide_legend(override.aes = list(alpha = 0.5)))
+      ggsave(paste0("bumpchart_", diaSpecification, "_", setting, "_", proteinList, ".pdf"), bump.chart, width=width, height=5)
+      
+    }
+    
+    meanOverProteinLists.df <- data.frame(bump.lst[[1]][,1:2], mean.mean.ranking=rowMeans(data.frame(bump.lst[[1]][,"mean.ranking"], bump.lst[[2]][,"mean.ranking"], bump.lst[[3]][,"mean.ranking"])))
+    bump.chart <- ggplot(data = meanOverProteinLists.df, aes(x = get(setting), y = mean.mean.ranking, group = get(diaSpecification), alpha=0.5)) +
+      geom_line(aes(color = get(diaSpecification)), size = 1) +
+      geom_point(aes(color = get(diaSpecification)), size = 2) +
+      scale_y_reverse(limits=c(length(unique(ranks.df[[setting]],0)), 1), breaks = 1:nrow(meanOverProteinLists.df)) +
+      ggtitle(paste0(diaSpecification, ", ", setting)) +
+      theme(legend.title = element_blank()) +
+      # xlab(setting) +
+      xlab("") +
+      scale_alpha(guide = 'none') +
+      guides(colour = guide_legend(override.aes = list(alpha = 0.5)))
+    ggsave(paste0("bumpchart_", diaSpecification, "_", setting, "_meanOverproteinLists.pdf"), bump.chart, width=width, height=5)
+  }
+}
+
+############################################################
+
+getDfModel <- function(modus, df) {
+  if (modus == "unnormalized"){
+    df.model <- df
+  } else if (modus == "TRQN") {
+    mtx <- as.matrix(df)
+    df.trqn <- MBQN::mbqn(mtx, FUN = mean)
+    row.names(df.trqn) <- row.names(df)
+    df.model <- as.data.frame(df.trqn)
+  } else if (modus == "QN"){
+    mtx <- as.matrix(df)
+    df.qn <- MBQN::mbqn(mtx, FUN = NULL)
+    row.names(df.qn) <- row.names(df)
+    df.model <- as.data.frame(df.qn)
+  }else if  (modus == "median"){
+    mtx <- as.matrix(df)
+    df.median <- limma::normalizeMedianValues(mtx)
+    df.model <- as.data.frame(df.median)
+  } else {
+    print("Undefined modus")
+  }
+  return(df.model)
+}
+
+pdf(paste0("boxplotSpeciesSeparated.pdf"))
+for (i in 1:length(diaWorkflowResults.log)) {
+  dia.name <- names(diaWorkflowResults.log)[i]
+  df <- diaWorkflowResults.log[[i]]
+  df <- df[,grepl("1-25|1-12", colnames(df))]
+  
+  normalizations <- c("unnormalized", "TRQN", "QN", "median")
+  
+  for (normalization in normalizations){
+    df.norm <- getDfModel(normalization, df)
+    df.norm$species <- "Human"
+    df.norm[grepl("_ECOLI", row.names(df.norm)),]$species <- "E. coli"
+    df.norm.long <- reshape2::melt(df.norm)
+    print(ggplot(df.norm.long, aes(x=value, y=forcats::fct_rev(variable), fill=species)) + 
+            geom_boxplot() +
+            geom_vline(aes(xintercept = median(value, na.rm = TRUE)), colour = 'red') +
+            xlab("Log2(Intensity)") +
+            ylab("DIA Workflow") +
+            theme(legend.title = element_blank())+
+            ggtitle(paste0(dia.name, ", ", normalization)))
+  }
+}
+dev.off()
+
+
+combinedProteinNames <- c()
+combinedProteinNames <- lapply(diaWorkflowResults.log, function(x, combinedProteinNames){
+  names <- unique(unlist(strsplit(row.names(x), ";")))
+  combinedProteinNames <- c(combinedProteinNames, names)
+  combinedProteinNames
+}, combinedProteinNames=combinedProteinNames)
+
+intersectProteinNames <- data.frame(table(unlist(combinedProteinNames)))
+# Get protein names present in ALL DIA workflows
+intersectProteinNamesAll <- intersectProteinNames[intersectProteinNames$Freq == 17,]$Var1
+
+old <- c("CTGEF_HUMAN;CTGE9_HUMAN;CTGE8_HUMAN;CTGE6_HUMAN;CTGE4_HUMAN;MIA2_HUMAN",
+         "IMA6_HUMAN;IMA7_HUMAN",
+         "LIN7A_HUMAN;LIN7C_HUMAN",
+         "NUD4B_HUMAN;NUDT4_HUMAN",
+         "RRAGB_HUMAN;RRAGA_HUMAN",
+         "SBNO1_HUMAN;SBNO2_HUMAN", 
+         "WAC2A_HUMAN;WAC2C_HUMAN")
+new <- c("MIA2_HUMAN",
+         "IMA7_HUMAN",
+         "LIN7C_HUMAN",
+         "NUDT4_HUMAN",
+         "RRAGA_HUMAN",
+         "SBNO1_HUMAN",
+         "WAC2A_HUMAN")
+
+
+# blub <- list()
+# for (i in 1:length(diaWorkflowResults.log)) {
+#   df <- diaWorkflowResults.log[[i]]
+#   df <- data.frame(protein.name = row.names(df))
+# 
+#   intersectBoolIntersect <- apply(df, 1, function(x) {
+#     length(intersect(unlist(base::strsplit(x[1], ";")), intersectProteinNamesAll))>0
+#   })
+#  
+#   for (j in 1:length(old)){
+#     #print(df$protein.name == old[j])
+#     try(df$protein.name[df$protein.name == old[j]] <- new[j])
+#   }
+#   
+#   df.intersectProtNames <- data.frame(df[intersectBoolIntersect & df$protein.name != "LAP2A_HUMAN;LAP2B_HUMAN", ])
+#   df.intersectProtNames <- df.intersectProtNames[order(df.intersectProtNames[,colnames(df.intersectProtNames)[1]]),]
+#   blub <- list.append(blub, df.intersectProtNames)
+#   
+# }
+# 
+# blub.df <- do.call(cbind, blub)  
+# colnames(blub.df) <- names(diaWorkflowResults.log)
+# 
+# uniques <- apply(blub.df, 1, function(x){
+#   # sum(unique(x))
+#   length(unique(x))
+# })
+# 
+# blub.df <- data.frame(blub.df, uniques)
+# final.intersect <- blub.df[,1]
+
+
+diaWorkflowResults.log.intersect <- lapply(diaWorkflowResults.log, function(x){
+  x <- x[row.names(x) !=  "LAP2A_HUMAN;LAP2B_HUMAN", ]
+  for (j in 1:length(old)){
+    #print(df$protein.name == old[j])
+    try(row.names(x)[row.names(x) == old[j]] <- new[j])
+  }
+  
+  x <- x[row.names(x) %in% intersectProteinNamesAll, ]
+  x <- x[order(row.names(x)),]
+  
+  x
+  # row.names(x)
+})
+
+# 
+# diaWorkflowResults.log.intersect.df <- do.call(cbind, diaWorkflowResults.log.intersect)  
+# colnames(diaWorkflowResults.log.intersect.df) <- names(diaWorkflowResults.log.intersect)
+# 
+# diaWorkflowResults.log.intersect.uniques <- apply(diaWorkflowResults.log.intersect.df, 1, function(x){
+#   # sum(unique(x))
+#   length(unique(x))
+# })
+# 
+# diaWorkflowResults.log.intersect.df <- data.frame(diaWorkflowResults.log.intersect.df, diaWorkflowResults.log.intersect.uniques)
+
+
+diaWorkflowResults.log.intersect <- lapply(diaWorkflowResults.log.intersect, function(x){
+  unlist(x)
+})
+
+diaWorkflowResults.log.intersect.df <- do.call(cbind, diaWorkflowResults.log.intersect)  
+colnames(diaWorkflowResults.log.intersect.df) <- names(diaWorkflowResults.log.intersect)
+
+
+M <- cor(diaWorkflowResults.log.intersect.df, use="pairwise.complete.obs") # "pairwise.complete.obs" as there are NAs in regVals for some dias
+
+pdf(file = paste0("corrplot_log2Intensities_diaworkflows.pdf"), width = 16, height = 16)
+corrplot::corrplot.mixed(M,  upper = "ellipse", lower = "number",
+                         tl.pos = "lt", tl.col = "black", mar=c(0,0,2,0))
+dev.off()
+
+pdf(file = paste0("networkplot_log2Intensities_diaworkflows.pdf"), width = 25, height = 25)
+diaWorkflowResults.log.intersect.df %>% 
+  corrr::correlate() %>% 
+  corrr::network_plot()
+dev.off()
