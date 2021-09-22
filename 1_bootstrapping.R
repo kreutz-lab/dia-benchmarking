@@ -6,7 +6,9 @@ library(dplyr)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 setwd('..')
-diaWorkflowResults <- lapply("Converted_to_same_format.RData", function(x) mget(load(x)))
+#diaWorkflowResults <- lapply("Converted_to_same_format.RData", function(x) mget(load(x)))
+diaWorkflowResults <- lapply("DIAsoftwareOutputProteinLevel.RData", function(x) mget(load(x)))
+
 diaWorkflowResults <- unlist(diaWorkflowResults,recursive=FALSE)
 
 diaWorkflowResults <- list.remove(diaWorkflowResults, ".Random.seed")
@@ -170,7 +172,8 @@ intersectProteinNames <- intersectProteinNames[intersectProteinNames$Freq>=14,]$
 # proteins appearing in at least one DIA workflow
 combinedProteinNames <- sort(unique(unlist(combinedProteinNames)))
 
-save(diaWorkflowResults, indices, intersectProteinNames, combinedProteinNames, file="Converted_to_same_format_wide_plusIndices_plusIntersectingAndCombinedProteinNames.RData")
+#save(diaWorkflowResults, indices, intersectProteinNames, combinedProteinNames, file="Converted_to_same_format_wide_plusIndices_plusIntersectingAndCombinedProteinNames.RData")
+save(diaWorkflowResults, indices, intersectProteinNames, combinedProteinNames, file="DIAsoftwareOutputProteinLevel_1to12And1to25Only_wideFormat_withBootstrapIndicesAndIntersectAndCombinedProteinNames.RData")
 
 saveRDS(intersectProteinNames, file = "intersectProteinNames.rds")
 saveRDS(combinedProteinNames, file = "combinedProteinNames.rds")

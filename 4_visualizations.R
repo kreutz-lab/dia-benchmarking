@@ -70,7 +70,8 @@ addSoftwareLibraryColumns <- function(df.combined.LibSoftware, sepSpace=FALSE) {
 
 ########################################################################
 
-diaWorkflowResults <- lapply("Converted_to_same_format.RData", function(x) mget(load(x)))
+#diaWorkflowResults <- lapply("Converted_to_same_format.RData", function(x) mget(load(x)))
+diaWorkflowResults <- lapply("DIAsoftwareOutputProteinLevel.RData", function(x) mget(load(x)))
 diaWorkflowResults <- unlist(diaWorkflowResults,recursive=FALSE)
 diaWorkflowResults <- list.remove(diaWorkflowResults, ".Random.seed")
 
@@ -895,7 +896,8 @@ plotPCAGrid(diaWorkflowResults.log.normalized, filename="FigS9_pcaNIPALS_QNnorma
 
 # GET NUMBER OF INTERSECT AND UNION PROTEINS FOR EACH BOOTSTRAP DATASET FOR EACH DIA WORKFLOW
 
-load("Converted_to_same_format_wide_plusIndices_plusIntersectingAndCombinedProteinNames.RData")
+#load("Converted_to_same_format_wide_plusIndices_plusIntersectingAndCombinedProteinNames.RData")
+load("DIAsoftwareOutputProteinLevel_1to12And1to25Only_wideFormat_withBootstrapIndicesAndIntersectAndCombinedProteinNames.RData")
 
 combinedProteinNames <- readRDS("combinedProteinNames.rds")
 intersectProteinNames <- readRDS("intersectProteinNames.rds")
