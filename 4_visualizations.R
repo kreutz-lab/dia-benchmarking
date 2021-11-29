@@ -25,6 +25,7 @@ library(forcats)
 library(pcaMethods)
 library(limma)
 library(cowplot)
+library(openxlsx)
 
 my_greens = brewer.pal(n = 9, "Greens")[3:9]
 
@@ -197,6 +198,28 @@ names(diaWorkflowResults.log)[names(diaWorkflowResults.log) == "Spectronaut_Dire
 names(diaWorkflowResults.log) <-  gsub("_", " ", names(diaWorkflowResults.log))
 diaWorkflowResults.log <- diaWorkflowResults.log[order(names(diaWorkflowResults.log))]
 
+# Save to xlsx file, each tab corresponding to one DIA software-library combination
+addToExcelWb <- function(out_xlsx, df_for_workbook, worksheetName, rowNames=FALSE){
+  # Check to see if file doesn't exist
+  if (!file.exists(out_xlsx))  {
+    # Create workbook using openxlsx
+    wb <- openxlsx::createWorkbook()
+  } else {
+    wb <- openxlsx::loadWorkbook(out_xlsx)
+  }
+  # Add worksheet
+  openxlsx::addWorksheet(wb, worksheetName)
+  # Write data frame to new worksheet
+  openxlsx::writeData(wb, worksheetName, df_for_workbook, rowNames = rowNames, colNames = TRUE, keepNA = TRUE, na.string="NA")
+  # Save file
+  openxlsx::saveWorkbook(wb, out_xlsx, overwrite = TRUE)
+}
+
+#for (diaworkflow.name in names(diaWorkflowResults.log)){
+#  addToExcelWb(paste0("diaWorkflowResults_log.xlsx"), diaWorkflowResults.log[[diaworkflow.name]], strtrim(diaworkflow.name, 31), rowNames = TRUE)
+#}
+
+#saveRDS(diaWorkflowResults.log, file = "diaWorkflowResults_log.rds")
 ########################################################################
 
 stacked <- lapply(1:length(diaWorkflowResults.log), function(idx){
@@ -217,10 +240,15 @@ stacked.df <- addSoftwareLibraryColumns(stacked.df, sepSpace = TRUE)
 stacked.df$dilution <- factor(stacked.df$dilution,
                               levels = c("Lymph nodes", "Lymph nodes + 1:25 E.coli", "Lymph nodes + 1:12 E.coli", "Lymph nodes + 1:6 E.coli"))
 
+#addToExcelWb("diaWorkflowResults_log_longFormat.xlsx", stacked.df, strtrim("diaWorkflowResults_log_longFormat", 31), rowNames = FALSE)
+
 stacked.nonNA <- stacked.df %>% filter(!is.na(intensity)) %>% dplyr::group_by(sample, dilution, dia) %>% 
   dplyr::summarise(NumberProteins = n())
 stacked.nonNA.meanMedians <- stacked.nonNA %>%  dplyr::group_by(dilution, dia) %>% 
   dplyr::summarise(median = median(NumberProteins), mean = mean(NumberProteins))
+
+stacked.nonNA.speciesSeparated <- stacked.df %>% filter(!is.na(intensity)) %>% dplyr::group_by(sample, dilution, dia, species) %>% 
+  dplyr::summarise(NumberProteins = n())
 
 # FIGURE 2
 ggplot.intensity.violinBoxplot <- ggplot(stacked.nonNA,aes(forcats::fct_rev(dia), NumberProteins, fill=forcats::fct_rev(dilution))) +
@@ -234,6 +262,31 @@ ggplot.intensity.violinBoxplot <- ggplot(stacked.nonNA,aes(forcats::fct_rev(dia)
         legend.justification = "left", legend.direction = "vertical") +
   guides(fill = guide_legend(reverse = TRUE)) 
 ggsave(file="Fig2_ProteinNumbers.pdf", ggplot.intensity.violinBoxplot, height=8, width=6)
+
+ggplot.intensity.violinBoxplot.Ecoli <- ggplot(stacked.nonNA.speciesSeparated[stacked.nonNA.speciesSeparated$species=="E. coli",],aes(forcats::fct_rev(dia), NumberProteins, fill=forcats::fct_rev(dilution))) +
+  geom_boxplot(alpha=0.5, outlier.size=0.5) +
+  coord_flip() +
+  xlab("") +
+  ylab("# Proteins") +
+  ggplot2::theme_minimal() +
+  ggplot2::scale_fill_brewer(palette="Greens", direction=-1) +
+  theme(legend.title = element_blank(), axis.text.y = element_text(hjust=0), legend.position="bottom",
+        legend.justification = "left", legend.direction = "vertical") +
+  guides(fill = guide_legend(reverse = TRUE)) 
+ggsave(file="Fig2_ProteinNumbers_Ecoli.pdf", ggplot.intensity.violinBoxplot.Ecoli, height=8, width=6)
+
+ggplot.intensity.violinBoxplot.Human <- ggplot(stacked.nonNA.speciesSeparated[stacked.nonNA.speciesSeparated$species=="Human",],aes(forcats::fct_rev(dia), NumberProteins, fill=forcats::fct_rev(dilution))) +
+  geom_boxplot(alpha=0.5, outlier.size=0.5) +
+  coord_flip() +
+  xlab("") +
+  ylab("# Proteins") +
+  ggplot2::theme_minimal() +
+  ggplot2::scale_fill_brewer(palette="Greens", direction=-1) +
+  theme(legend.title = element_blank(), axis.text.y = element_text(hjust=0), legend.position="bottom",
+        legend.justification = "left", legend.direction = "vertical") +
+  guides(fill = guide_legend(reverse = TRUE)) 
+ggsave(file="Fig2_ProteinNumbers_Human.pdf", ggplot.intensity.violinBoxplot.Human, height=8, width=6)
+
 
 ggplot.intensityFacet <- ggplot(stacked.df, aes(x = intensity, y=forcats::fct_rev(dia), fill=forcats::fct_rev(dilution))) + 
   ggridges::geom_density_ridges(alpha=0.5) +
@@ -289,9 +342,25 @@ ggplot.var <- ggplot(stacked.df.var[stacked.df.var$species == "E. coli", ], aes(
 ggsave(file="ggplot.intensityvariance.boxplot_Ecoli.pdf", ggplot.var, height=8, width=6)
 
 # FIGURE 2
-ggplot.var.mins15 <- ggplot.var + xlim(-15, NA) 
-ggsave(file="Fig2_proteinVariance_Ecoli_xlimMinus15.pdf", ggplot.var.mins15, height=8, width=6)
+ggplot.var.mins12 <- ggplot.var + xlim(-12, NA) 
+ggsave(file="Fig2_proteinVariance_Ecoli_xlimMinus12.pdf", ggplot.var.mins12, height=8, width=6)
 
+
+ggplot.var.human <- ggplot(stacked.df.var[stacked.df.var$species == "Human", ], aes(x = log2(variance), 
+                                                                                y=forcats::fct_rev(dia), fill=forcats::fct_rev(dilution))) + 
+  geom_boxplot(alpha=0.5, outlier.size=0.5) +
+  ggplot2::theme_minimal() +
+  ggplot2::scale_fill_brewer(palette="Greens", direction=-1) +
+  theme(legend.title = element_blank(), axis.text.y = element_text(hjust=0), legend.position="bottom",
+        legend.justification = "left", legend.direction = "vertical") +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  xlab("Log2(Variance)") +
+  ylab("") +
+  ggtitle("Human")
+ggsave(file="ggplot.intensityvariance.boxplot_Human.pdf", ggplot.var.human, height=8, width=6)
+
+ggplot.var.human.mins20 <- ggplot.var.human + xlim(-20, NA) 
+ggsave(file="Fig2_proteinVariance_Human_xlimMinus20.pdf", ggplot.var.human.mins20, height=8, width=6)
 
 ########################################################################
 
@@ -372,11 +441,18 @@ for (species in c("E. coli", "Human", "E. coli & Human")) {
   dev.off()
   
   if (species == "E. coli & Human"){
-    df2 <- getSampleNADfPerSpecies(diaWorkflowResults.log, species="")
-    df2 <- addSoftwareLibraryColumns(df2, sepSpace = TRUE) 
-    
+    speciesString <- ""
+  } else if (species == "E. coli"){
+    speciesString <- "ECOLI"
+  } else if (species == "Human"){
+    speciesString <- "HUMAN"
+  }
+  
+  df2 <- getSampleNADfPerSpecies(diaWorkflowResults.log, species=speciesString)
+  df2 <- addSoftwareLibraryColumns(df2, sepSpace = TRUE) 
+   
+  pdf(file=paste0("Fig3B_sampleMeansNACorrelation_", gsub(" |\\.", "_", species),".pdf"), width=8, height=6)
     # FIGURE 3B
-    pdf(file=paste0("Fig3B_sampleMeansNACorrelation_", gsub(" |\\.", "_", species),".pdf"), width=8, height=6)
     print(ggplot(df2, aes(x = percNAsInSample, y = sampleMeans, color=forcats::fct_rev(dilution))) + 
             geom_point(size=0.9, alpha=0.5, stroke = 0.1) +
             facet_grid(diaSoftware ~ diaLibrary,  scales = "free") +
@@ -386,8 +462,7 @@ for (species in c("E. coli", "Human", "E. coli & Human")) {
             theme(legend.title = element_blank(), axis.text.y = element_text(hjust=0), legend.position="bottom",
                   legend.justification = "left", legend.direction = "vertical") +
             guides(color = guide_legend(override.aes = list(alpha = 1))) )
-    dev.off()
-  }
+  dev.off()
 }
 
 ########################################################################
@@ -1080,37 +1155,61 @@ df.combined$dia <- gsub("_", " ", df.combined$dia)
 
 settings <- c("dia", "normalization", "sparsityReduction", "statTest") 
 
-data.characteristics <- c("groupSize", "portionEcoliProteins", "nAllProteins", 
-                          "portionEcoliProteins.pre", "nAllProteins.pre", 
-                          "medianSampleVariance", "medianProteinVariance", "KS.SignProp", 
-                          "percNATotal", "percOfRowsWithNAs",
-                          "entropy.wNAs", "kurtosis.wNAs", "meanDeviation.wNAs", 
-                          "skewness.wNAs", "uniformity.wNAs", "variance.wNAs", "RMS.wNAs", 
-                          "var.groups.ratio.wNAs", "entropy.woNAs", "kurtosis.woNAs", "meanDeviation.woNAs", 
-                          "skewness.woNAs", "uniformity.woNAs", "variance.woNAs", "RMS.woNAs", 
-                          "var.groups.ratio.woNAs", "prctPC1.woNAs", "elongation.woNAs", 
-                          "flatness.woNAs", "heterosc.oneMinuspi0", "nProteins.woNAs")
 
-eval.measures <- c("p.pauc_0.8_correctFALSE.combined", 
-                   "p.pauc_0.9_correctFALSE.combined", "p.pauc_0.95_correctFALSE.combined", 
-                   "sensAtpVal005.combined", "regpValsProp.combined", 
-                   "rankAUC.FCpVal.combined", "rankAUC.FC.combined", "rankAUC.pVal.combined", 
-                   "p.pauc_0.8_correctFALSE.intersect", 
-                   "p.pauc_0.9_correctFALSE.intersect", "p.pauc_0.95_correctFALSE.intersect", 
-                   "sensAtpVal005.intersect", 
-                   "regpValsProp.intersect", "rankAUC.FCpVal.intersect", "rankAUC.FC.intersect", 
-                   "rankAUC.pVal.intersect", 
-                   "p.pauc_0.8_correctFALSE.DiaWorkflowProteins", "p.pauc_0.9_correctFALSE.DiaWorkflowProteins", 
-                   "p.pauc_0.95_correctFALSE.DiaWorkflowProteins", 
-                   "sensAtpVal005.DiaWorkflowProteins", "regpValsProp.DiaWorkflowProteins", 
-                   "rankAUC.FCpVal.DiaWorkflowProteins", "rankAUC.FC.DiaWorkflowProteins", 
-                   "rankAUC.pVal.DiaWorkflowProteins",
-                   "RMSEEcoli.DiaWorkflowProteins", "RMSEHuman.DiaWorkflowProteins", "RMSEHumanAndEcoli.DiaWorkflowProteins",
-                   "RMSEEcoli.intersect", "RMSEHuman.intersect",
-                   "RMSEHumanAndEcoli.intersect"
-)
+df.combined <- df.combined[, c("X1", "dia", "normalization", "sparsityReduction", "statTest", 
+                             "groupSize", "medianSampleVariance", "medianProteinVariance", 
+                             "percNATotal",  "kurtosis.wNAs", "skewness.wNAs", 
+                             "var.groups.ratio.wNAs", "prctPC1.woNAs", "p.pauc_0.8_correctFALSE.combined",
+                             "sensAtpVal005.combined", "regpValsProp.combined", "p.pauc_0.8_correctFALSE.intersect",  
+                             "sensAtpVal005.intersect", "regpValsProp.intersect", "p.pauc_0.8_correctFALSE.DiaWorkflowProteins", 
+                             "sensAtpVal005.DiaWorkflowProteins", "regpValsProp.DiaWorkflowProteins", "RMSEEcoli.intersect", 
+                             "RMSEHuman.intersect", "RMSEEcoli.DiaWorkflowProteins", "RMSEHuman.DiaWorkflowProteins")]
+
+names(df.combined)[names(df.combined) == 'X1'] <- 'bootstrap.dataset'
+#write.csv(df.combined, "bootstrap_benchmark_results.csv", row.names = FALSE)
+#addToExcelWb("bootstrap_benchmark_results.xlsx", df.combined, strtrim("bootstrap_benchmark_results", 31), rowNames = FALSE)
+#saveRDS(df.combined, "bootstrap_benchmark_results.rds")
+
 
 eval.measure <- "p.pauc_0.8_correctFALSE.DiaWorkflowProteins"
+
+########################################################################
+# Sample uniqueness vs. performance of statistical tests
+
+indices <- readRDS("indices.rds")
+
+duplicate.df <- data.frame(do.call(rbind, lapply(indices, function (x) c(nUniqueSamples=length(unique(x)), nSamples=length(x)))))
+duplicate.df$bootstrap.dataset <- row.names(duplicate.df)
+duplicate.df$portionUniqueSamples <- duplicate.df$nUniqueSamples/duplicate.df$nSamples
+duplicate.df <- duplicate.df[, c(3, 1, 2, 4)]
+
+df.combined.wDuplicateDf <- merge(df.combined, duplicate.df, by = "bootstrap.dataset")
+maxpAUC <- max(df.combined.wDuplicateDf$p.pauc_0.8_correctFALSE.DiaWorkflowProteins)
+
+selectedGroupSizes <- c(3, 6, 13, 23)
+for (selectedGroupSize in selectedGroupSizes){
+  for (selectedSR in unique(df.combined.wDuplicateDf$sparsityReduction)){
+    
+    df.combined.wDuplicateDf1 <- df.combined.wDuplicateDf[df.combined.wDuplicateDf$sparsityReduction == selectedSR & df.combined.wDuplicateDf$groupSize==selectedGroupSize,]
+    
+    plots <- df.combined.wDuplicateDf1 %>% dplyr::group_by(df.combined.wDuplicateDf1$dia) %>%
+      do(
+        plots = ggplot(data = .) + aes(x=portionUniqueSamples, y=p.pauc_0.8_correctFALSE.DiaWorkflowProteins, color=statTest) +
+          geom_point(alpha=0.1, size = 0.25) + ggtitle(paste(.$dia, selectedSR, selectedGroupSize, sep = ", ")) +
+          guides(colour = guide_legend(override.aes = list(alpha = 1))) +
+          theme_minimal() +
+          geom_smooth(method=lm, aes(fill=statTest)) +
+          ylim(0, maxpAUC)
+      )
+    
+    pdf(file=paste0("correlation_portionUniqueSamples_pAUC_", selectedSR, "only_groupSize", selectedGroupSize, ".pdf"))
+    for (plot in plots$plots){
+      print(plot)
+    }
+    dev.off()
+  }
+}
+
 
 ########################################################################
 # Performance without separation by settings
@@ -1351,7 +1450,7 @@ ggsave(file=paste0("FigS5_charact_bootstrapDatasets_NoSROnly.pdf"), ggplot.chara
 ########################################################################
 
 sett <- "dia"
-sel <- c("X1", "groupSize", settings)
+sel <- c("bootstrap.dataset", "groupSize", settings)
 
 eval.measures <- c("p.pauc_0.8_correctFALSE.DiaWorkflowProteins", "p.pauc_0.8_correctFALSE.intersect", "p.pauc_0.8_correctFALSE.combined")
 for (eval.measure in eval.measures){
@@ -1402,9 +1501,9 @@ diaSpecifications <- c("dia", "diaSoftware", "diaLibrary")
 settings <- c("statTest", "sparsityReduction", "normalization")
 proteinLists <- c("DiaWorkflowProteins", "intersect", "combined")
 # ranks.statTest <- df.combined2 %>% 
-#   dplyr::group_by(X1, statTest, dia) %>% 
+#   dplyr::group_by(bootstrap.dataset, statTest, dia) %>% 
 #   summarise(mean.p.pauc_0.8_correctFALSE.DiaWorkflowProteins = mean(p.pauc_0.8_correctFALSE.DiaWorkflowProteins)) %>% 
-#   dplyr::group_by(X1, dia) %>%
+#   dplyr::group_by(bootstrap.dataset, dia) %>%
 #   mutate(ranking = rank(- mean.p.pauc_0.8_correctFALSE.DiaWorkflowProteins)) %>% 
 #   dplyr::group_by(statTest, dia) %>% 
 #   summarise(mean.ranking = mean(ranking))
@@ -1415,9 +1514,9 @@ for (setting in settings){
     bump.lst <- list()
     for (proteinList in proteinLists) {
       ranks.df <- df.combined2 %>% 
-        dplyr::group_by(X1, !!as.name(setting), dia, diaSoftware, diaLibrary) %>% 
+        dplyr::group_by(bootstrap.dataset, !!as.name(setting), dia, diaSoftware, diaLibrary) %>% 
         summarise(mean.pAUC = mean(!!as.name(paste0("p.pauc_0.8_correctFALSE.", proteinList)))) %>% 
-        dplyr::group_by(X1, dia) %>%
+        dplyr::group_by(bootstrap.dataset, dia) %>%
         mutate(ranking = rank(- mean.pAUC)) %>% 
         dplyr::group_by(!!as.name(setting), !!as.name(diaSpecification)) %>% 
         summarise(mean.ranking = mean(ranking))
