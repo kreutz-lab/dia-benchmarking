@@ -1184,6 +1184,10 @@ duplicate.df$portionUniqueSamples <- duplicate.df$nUniqueSamples/duplicate.df$nS
 duplicate.df <- duplicate.df[, c(3, 1, 2, 4)]
 
 df.combined.wDuplicateDf <- merge(df.combined, duplicate.df, by = "bootstrap.dataset")
+#write.csv(df.combined.wDuplicateDf, "bootstrap_benchmark_results_wPortionUniqueSamples.csv", row.names = FALSE)
+#addToExcelWb("bootstrap_benchmark_results_wPortionUniqueSamples.xlsx", df.combined.wDuplicateDf, strtrim("bootstrap_benchmark_results_wPortionUniqueSamples", 31), rowNames = FALSE)
+
+
 maxpAUC <- max(df.combined.wDuplicateDf$p.pauc_0.8_correctFALSE.DiaWorkflowProteins)
 
 selectedGroupSizes <- c(3, 6, 13, 23)
