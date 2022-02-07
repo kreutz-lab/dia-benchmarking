@@ -1,0 +1,29 @@
+R version 4.1.1 (2021-08-10)
+Platform: x86_64-apple-darwin17.0 (64-bit)
+Running under: macOS Monterey 12.2
+
+Matrix products: default
+LAPACK: /Library/Frameworks/R.framework/Versions/4.1/Resources/lib/libRlapack.dylib
+
+locale:
+[1] en_GB.UTF-8/en_GB.UTF-8/en_GB.UTF-8/C/en_GB.UTF-8/en_GB.UTF-8
+
+attached base packages:
+[1] parallel  stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+ [1] doParallel_1.0.16   iterators_1.0.13    foreach_1.5.1       limma_3.48.3        pcaMethods_1.84.0   Biobase_2.52.0     
+ [7] BiocGenerics_0.38.0 corrr_0.4.3         corrplot_0.92       UpSetR_1.4.0        ggridges_0.5.3      viridis_0.6.2      
+[13] viridisLite_0.4.0   patchwork_1.1.1     gridExtra_2.3       cowplot_1.1.1       RColorBrewer_1.1-2  ggplot2_3.3.5      
+[19] reshape2_1.4.4      dplyr_1.0.7         plyr_1.8.6          tidyr_1.1.4         forcats_0.5.1       readr_2.1.1        
+[25] svglite_2.0.0       openxlsx_4.2.5      rlist_0.4.6.2      
+
+loaded via a namespace (and not attached):
+ [1] ggrepel_0.9.1     Rcpp_1.0.8        lattice_0.20-45   assertthat_0.2.1  digest_0.6.29     utf8_1.2.2        R6_2.5.1         
+ [8] pillar_1.6.4      rlang_0.4.12      rstudioapi_0.13   data.table_1.14.2 Matrix_1.4-0      splines_4.1.1     labeling_0.4.2   
+[15] stringr_1.4.0     bit_4.0.4         munsell_0.5.0     compiler_4.1.1    pkgconfig_2.0.3   systemfonts_1.0.2 mgcv_1.8-38      
+[22] tidyselect_1.1.1  tibble_3.1.6      codetools_0.2-18  fansi_1.0.2       crayon_1.4.2      tzdb_0.2.0        withr_2.4.3      
+[29] grid_4.1.1        nlme_3.1-155      gtable_0.3.0      lifecycle_1.0.1   DBI_1.1.2         magrittr_2.0.1    scales_1.1.1     
+[36] zip_2.2.0         cli_3.1.0         vroom_1.5.7       stringi_1.7.6     farver_2.1.0      ellipsis_0.3.2    generics_0.1.1   
+[43] vctrs_0.3.8       MBQN_2.5.6        tools_4.1.1       bit64_4.0.5       glue_1.6.0        purrr_0.3.4       hms_1.1.1        
+[50] colorspace_2.0-2 

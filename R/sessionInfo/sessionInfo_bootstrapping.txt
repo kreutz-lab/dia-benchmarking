@@ -1,0 +1,26 @@
+R version 4.1.1 (2021-08-10)
+Platform: x86_64-apple-darwin17.0 (64-bit)
+Running under: macOS Big Sur 10.16
+
+Matrix products: default
+LAPACK: /Library/Frameworks/R.framework/Versions/4.1/Resources/lib/libRlapack.dylib
+
+locale:
+[1] en_GB.UTF-8/en_GB.UTF-8/en_GB.UTF-8/C/en_GB.UTF-8/en_GB.UTF-8
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] dplyr_1.0.7       tidyr_1.1.4       rlist_0.4.6.2     data.table_1.14.2
+
+loaded via a namespace (and not attached):
+ [1] zip_2.2.0           Rcpp_1.0.8          pillar_1.6.4        compiler_4.1.1      plyr_1.8.6          viridis_0.6.2      
+ [7] forcats_0.5.1       tools_4.1.1         corrplot_0.92       viridisLite_0.4.0   lifecycle_1.0.1     tibble_3.1.6       
+[13] gtable_0.3.0        pkgconfig_2.0.3     rlang_0.4.12        openxlsx_4.2.5      DBI_1.1.2           rstudioapi_0.13    
+[19] patchwork_1.1.1     parallel_4.1.1      MBQN_2.5.6          gridExtra_2.3       UpSetR_1.4.0        corrr_0.4.3        
+[25] stringr_1.4.0       generics_0.1.1      vctrs_0.3.8         cowplot_1.1.1       grid_4.1.1          tidyselect_1.1.1   
+[31] Biobase_2.52.0      glue_1.6.0          R6_2.5.1            fansi_1.0.2         limma_3.48.3        reshape2_1.4.4     
+[37] purrr_0.3.4         ggplot2_3.3.5       magrittr_2.0.1      BiocGenerics_0.38.0 pcaMethods_1.84.0   scales_1.1.1       
+[43] ggridges_0.5.3      ellipsis_0.3.2      assertthat_0.2.1    colorspace_2.0-2    utf8_1.2.2          stringi_1.7.6      
+[49] munsell_0.5.0       crayon_1.4.2       
