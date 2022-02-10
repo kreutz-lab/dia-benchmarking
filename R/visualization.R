@@ -112,19 +112,14 @@ addToExcelWb <- function(out_xlsx, df_for_workbook, worksheetName, rowNames=FALS
   openxlsx::saveWorkbook(wb, out_xlsx, overwrite = TRUE)
 }
 
-#for (diaworkflow.name in names(diaWorkflowResults)){
-#  addToExcelWb(paste0("diaWorkflowResults_log.xlsx"), diaWorkflowResults[[diaworkflow.name]], strtrim(diaworkflow.name, 31), rowNames = TRUE)
-#}
-
-#saveRDS(diaWorkflowResults, file = "diaWorkflowResults_log.rds")
 ########################################################################
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 diaWorkflowResults.precursors <- unlist(lapply("DIAsoftwareOutputPrecursorLevel.RData", function(x) mget(load(x))), recursive = FALSE)
 diaWorkflowResults.precursors <- rlist::list.remove(diaWorkflowResults.precursors, c(".Random.seed", "OSW_DIANN", "anotation_df2"))
 
-oldNames <- c("DIANN_PROSIT", "DIANN_predicted", "Spectronaut_PROSIT", "DIANN_Maxquant")
-newNames <- c("DIANN_PROSIT_EDIA_GPF", "DIANN_DIANN_AI", "Spectronaut_PROSIT_EDIA_GPF", "DIANN_MaxQuant")
+oldNames <- c("DIANN_PROSIT", "DIANN_predicted", "Spectronaut_PROSIT", "DIANN_Maxquant", "Spectronaut_DirectDIA")
+newNames <- c("DIANN_PROSIT_EDIA_GPF", "DIANN_Predicted", "Spectronaut_PROSIT_EDIA_GPF", "DIANN_MaxQuant", "Spectronaut_Predicted")
 
 mm <- match(names(diaWorkflowResults.precursors), oldNames)
 names(diaWorkflowResults.precursors)[!is.na(mm)] <- as.character(newNames[na.omit(mm)])
@@ -242,6 +237,9 @@ diaWorkflowResults.precursors <- lapply(diaWorkflowResults.precursors,function(x
 
 saveRDS(diaWorkflowResults.precursors, file = "diaWorkflowResults_allDilutions_precursorLevel.rds")
 
+# for (diaworkflow.name in names(diaWorkflowResults.precursors)){
+#   addToExcelWb(paste0("diaWorkflowResults_allDilutions_precursorLevel.xlsx"), diaWorkflowResults.precursors[[diaworkflow.name]], strtrim(diaworkflow.name, 31), rowNames = TRUE)
+# }
 ########################################################################
 getStackedList <- function(idx, colID, diaWorkflowResults){
   x <- diaWorkflowResults[[idx]]
@@ -421,6 +419,10 @@ names(diaWorkflowResults) <- sub("SkylineMSstats", "Skyline",names(diaWorkflowRe
 names(diaWorkflowResults)[names(diaWorkflowResults)=="DIANN_DIANN_AI"] <- "DIANN_Predicted"
 names(diaWorkflowResults)[names(diaWorkflowResults)=="Spectronaut_DirectDIA"] <- "Spectronaut_Predicted"
 diaWorkflowResults <- diaWorkflowResults[order(names(diaWorkflowResults))]
+
+for (diaworkflow.name in names(diaWorkflowResults)){
+  addToExcelWb(paste0("diaWorkflowResults_allDilutions.xlsx"), diaWorkflowResults[[diaworkflow.name]], strtrim(diaworkflow.name, 31), rowNames = TRUE)
+}
 
 
 # Remove data of sample 1-6_028 due to too many missing values
@@ -820,7 +822,7 @@ plotIntensityViolinplotsInGrid <- function(diaWorkflowResults, level=c("proteinL
     ggtitle(paste0("E.coli, ", level)))
   dev.off()
   
-  pdf(file=paste0("S5_intensityViolinplots_forEachdiaWorkflow_human_", level, ".pdf"), width=10, height=8)
+  pdf(file=paste0("FigS5_intensityViolinplots_forEachdiaWorkflow_human_", level, ".pdf"), width=10, height=8)
   print(ggplot(comInt.Human, aes(x = dilution, y = intensity)) + 
     geom_violin(scale="count") +
     geom_boxplot(width=0.08, outlier.size=0.5, outlier.alpha=0.4) +
@@ -835,7 +837,7 @@ plotIntensityViolinplotsInGrid <- function(diaWorkflowResults, level=c("proteinL
 }
 
 
-plotIntensityViolinplotsInGrid(diaWorkflowResults, level="proteinLevel", fileprefix="S4")
+plotIntensityViolinplotsInGrid(diaWorkflowResults, level="proteinLevel", fileprefix="FigS4")
 #plotIntensityViolinplotsInGrid(diaWorkflowResults.precursors, level="precursorLevel", fileprefix="S")
 
 ############################################################
@@ -1223,11 +1225,14 @@ duplicate.df <- data.frame(do.call(rbind, lapply(indices, function (x) c(nUnique
 duplicate.df$bootstrap.dataset <- row.names(duplicate.df)
 duplicate.df$portionUniqueSamples <- duplicate.df$nUniqueSamples/duplicate.df$nSamples
 duplicate.df <- duplicate.df[, c(3, 1, 2, 4)]
+df.combined$pAUC.combined <- df.combined$p.pauc_0.9_correctFALSE.combined * 1000
+df.combined$pAUC.intersection <- df.combined$p.pauc_0.9_correctFALSE.intersect * 1000
+df.combined$pAUC.diaWorkflow <- df.combined$p.pauc_0.9_correctFALSE.diaWorkflow * 1000
 
 df.combined <- merge(df.combined, duplicate.df, by = "bootstrap.dataset")
 
-write.csv(df.combined, "20220125_benchmark_analysis_results.csv", row.names = FALSE)
-saveRDS(df.combined, "20220125_benchmark_analysis_results.rds")
+write.csv(df.combined, "BootstrapAnalysisResults.csv", row.names = FALSE)
+saveRDS(df.combined, "BootstrapAnalysisResults.rds")
 
 settings <- c("dia", "normalization", "sparsityReduction", "statTest") 
 
@@ -1235,19 +1240,19 @@ settings <- c("dia", "normalization", "sparsityReduction", "statTest")
 df.combined <- df.combined[, c("bootstrap.dataset", "dia", "normalization", "sparsityReduction", "statTest", 
                                "groupSize", "medianSampleVariance", "medianProteinVariance", 
                                "percNATotal",  "kurtosis.wNAs", "skewness.wNAs", 
-                               "var.groups.ratio.wNAs", "prctPC1.woNAs", "prctPC2.woNAs", "portionPC2PC1.woNAs", "p.pauc_0.9_correctFALSE.combined",
-                               "sensAtpVal005.combined", "regpValsProp.combined", "p.pauc_0.9_correctFALSE.intersect",  
-                               "sensAtpVal005.intersect", "regpValsProp.intersect", "p.pauc_0.9_correctFALSE.diaWorkflow", 
+                               "var.groups.ratio.wNAs", "prctPC1.woNAs", "prctPC2.woNAs", "portionPC2PC1.woNAs", "pAUC.combined",
+                               "sensAtpVal005.combined", "regpValsProp.combined", "pAUC.intersect",  
+                               "sensAtpVal005.intersect", "regpValsProp.intersect", "pAUC.diaWorkflow", 
                                "sensAtpVal005.diaWorkflow", "regpValsProp.diaWorkflow", 
                                "RMSEEcoli.intersect", "RMSEHuman.intersect", "RMSEHumanAndEcoli.intersect",
                                "RMSEEcoli.diaWorkflow", "RMSEHuman.diaWorkflow", "RMSEHumanAndEcoli.diaWorkflow",
                                "portionUniqueSamples")]
 
-eval.measure <- "p.pauc_0.9_correctFALSE.diaWorkflow"
+eval.measure <- "pAUC.diaWorkflow"
 
 ########################################################################
 
-maxpAUC <- max(df.combined$p.pauc_0.9_correctFALSE.diaWorkflow)
+maxpAUC <- max(df.combined$pAUC.diaWorkflow)
 
 selectedGroupSizes <- c(3, 6, 13, 23)
 for (selectedGroupSize in selectedGroupSizes){
@@ -1257,7 +1262,7 @@ for (selectedGroupSize in selectedGroupSizes){
     
     plots <- df.combined1 %>% dplyr::group_by(df.combined1$dia) %>%
       do(
-        plots = ggplot(data = .) + aes(x=portionUniqueSamples, y=p.pauc_0.9_correctFALSE.diaWorkflow, color=statTest) +
+        plots = ggplot(data = .) + aes(x=portionUniqueSamples, y=pAUC.diaWorkflow, color=statTest) +
           geom_point(alpha=0.1, size = 0.25) + ggtitle(paste(.$dia, selectedSR, selectedGroupSize, sep = ", ")) +
           guides(colour = guide_legend(override.aes = list(alpha = 1))) +
           theme_minimal() +
@@ -1265,7 +1270,7 @@ for (selectedGroupSize in selectedGroupSizes){
           ylim(0, maxpAUC)
       )
     
-    pdf(file=paste0("S19_correlation_portionUniqueSamples_pAUC_", selectedSR, "only_groupSize", selectedGroupSize, ".pdf"))
+    pdf(file=paste0("FigS19_correlation_portionUniqueSamples_pAUC_", selectedSR, "only_groupSize", selectedGroupSize, ".pdf"))
     for (plot in plots$plots){
       print(plot)
     }
@@ -1278,7 +1283,7 @@ for (selectedGroupSize in selectedGroupSizes){
 # 
 # df.combined.LibSoftware <- addSoftwareLibraryColumns(df.combined, sepSpace=TRUE)
 # 
-# print(ggplot(df.combined.LibSoftware, aes(x=RMSEHumanAndEcoli.diaWorkflow, y=p.pauc_0.9_correctFALSE.diaWorkflow, col=diaSoftware)) +
+# print(ggplot(df.combined.LibSoftware, aes(x=RMSEHumanAndEcoli.diaWorkflow, y=pAUC.diaWorkflow, col=diaSoftware)) +
 #         geom_scattermore(alpha=0.01)+
 #         theme(legend.title = element_blank()) +
 #         guides(colour = guide_legend(override.aes = list(alpha = 1))))
@@ -1287,7 +1292,7 @@ for (selectedGroupSize in selectedGroupSizes){
 # 
 # 
 # pdf(file=paste0("S_correlation_RMSE_pAUC90_2.pdf"))
-# print(ggplot(df.combined.LibSoftware, aes(x=RMSEHumanAndEcoli.diaWorkflow, y=p.pauc_0.9_correctFALSE.diaWorkflow, col=sparsityReduction)) +
+# print(ggplot(df.combined.LibSoftware, aes(x=RMSEHumanAndEcoli.diaWorkflow, y=pAUC.diaWorkflow, col=sparsityReduction)) +
 #         geom_point(alpha=0.05, pch='.') + 
 #         theme(legend.title = element_blank()) +
 #         facet_grid(diaSoftware ~ diaLibrary, scales = "fixed") +
@@ -1296,7 +1301,7 @@ for (selectedGroupSize in selectedGroupSizes){
 # 
 # for (setting in setdiff(settings, "dia")) {
 #   pdf(file=paste0("S_correlation_RMSE_pAUC90_", setting, ".pdf"), height = 10, width = 10)
-#   print(ggplot(df.combined.LibSoftware, aes(x=RMSEHumanAndEcoli.diaWorkflow, y=p.pauc_0.9_correctFALSE.diaWorkflow, col=.data[[setting]])) +
+#   print(ggplot(df.combined.LibSoftware, aes(x=RMSEHumanAndEcoli.diaWorkflow, y=pAUC.diaWorkflow, col=.data[[setting]])) +
 #           geom_point(alpha=0.02, pch='.') + 
 #           theme(legend.title = element_blank()) +
 #           facet_grid(diaSoftware ~ diaLibrary, scales = "fixed") +
@@ -1331,7 +1336,7 @@ plotViolinPlotsCombSettingHorizontal <- function(setting, df.combined, eval.meas
 }
 
 # FIGURE 4
-eval.measures <- c("p.pauc_0.9_correctFALSE.diaWorkflow", "p.pauc_0.9_correctFALSE.intersect", "p.pauc_0.9_correctFALSE.combined")
+eval.measures <- c("pAUC.diaWorkflow", "pAUC.intersection", "pAUC.combined")
 
 for (eval.measure in eval.measures){
   plotsSettings <- lapply(settings, plotViolinPlotsCombSettingHorizontal, df.combined=df.combined, eval.measure=eval.measure)
@@ -1347,7 +1352,7 @@ for (eval.measure in eval.measures){
   dev.off()
 }
 
-eval.measure <- "p.pauc_0.9_correctFALSE.diaWorkflow"
+eval.measure <- "pAUC.diaWorkflow"
 selectedSR <- "NoSR"
 
 df.combined.SelectedSRonly <- df.combined[df.combined$sparsityReduction==selectedSR,]
@@ -1357,7 +1362,7 @@ svg(file = paste0("violinPlots_settingsCombined_", selectedSR, "_", eval.measure
 cowplot::plot_grid(plotlist=plotsSettings.SelectedSR, align = "v", ncol=1)
 dev.off()
 
-eval.measure <- "p.pauc_0.9_correctFALSE.diaWorkflow"
+eval.measure <- "pAUC.diaWorkflow"
 svg(file = paste0("Fig4B_violinPlots_settingsCombined_", eval.measure, "_SRs.svg"), height = 5, width = 5)
 ggplot(df.combined, aes(x = sparsityReduction, y = get(eval.measure))) + 
   xlab("") +
@@ -1391,17 +1396,17 @@ df.combined.LibSoftware <- addSoftwareLibraryColumns(df.combined.LibSoftware, se
 df.combined.LibSoftware.NoSROnly <- df.combined.LibSoftware[df.combined.LibSoftware$sparsityReduction=="NoSR",]
 
 # SUPPLEMENTARY FIGURE S6
-getViolinGrid("normalization","p.pauc_0.9_correctFALSE.diaWorkflow", df.combined.LibSoftware.NoSROnly, str="FigS13_normalization_violin_NoSROnly_")
+getViolinGrid("normalization","pAUC.diaWorkflow", df.combined.LibSoftware.NoSROnly, str="FigS13_normalization_violin_NoSROnly_")
 
 # SUPPLEMENTARY FIGURE S7
-getViolinGrid("statTest","p.pauc_0.9_correctFALSE.diaWorkflow", df.combined.LibSoftware.NoSROnly, str="FigS14_statTest_violin_NoSROnly_")
+getViolinGrid("statTest","pAUC.diaWorkflow", df.combined.LibSoftware.NoSROnly, str="FigS14_statTest_violin_NoSROnly_")
 
 df.combined.LibSoftware.NoSROnly$groupSize <- as.numeric(as.character(df.combined.LibSoftware.NoSROnly$groupSize))
 
 # SUPPLEMENTARY FIGURE S17
-for (eval.measure2 in c("p.pauc_0.9_correctFALSE.diaWorkflow", 
-                        "p.pauc_0.9_correctFALSE.intersect", 
-                        "p.pauc_0.9_correctFALSE.combined",
+for (eval.measure2 in c("pAUC.diaWorkflow", 
+                        "pAUC.intersection", 
+                        "pAUC.combined",
                         "sensAtpVal005.diaWorkflow", 
                         "sensAtpVal005.intersect", 
                         "sensAtpVal005.combined" 
@@ -1426,9 +1431,9 @@ df.combined.LibSoftware.selected <- df.combined.LibSoftware[, c("dia",
                                                                 "sparsityReduction",
                                                                 "groupSize",
                                                                 "statTest",
-                                                                "p.pauc_0.9_correctFALSE.combined",
-                                                                "p.pauc_0.9_correctFALSE.intersect",
-                                                                "p.pauc_0.9_correctFALSE.diaWorkflow")]
+                                                                "pAUC.combined",
+                                                                "pAUC.intersection",
+                                                                "pAUC.diaWorkflow")]
 
 # selectedDia <- "DIANN DIANN AI GPF"
 for (selectedDia in unique(df.combined.LibSoftware.selected$dia)){
@@ -1459,11 +1464,11 @@ data.characteristics.sel <- c("groupSize",
                               "percNATotal", "kurtosis.wNAs", "skewness.wNAs", 
                               "var.groups.ratio.wNAs", "prctPC1.woNAs", "prctPC2.woNAs")
 
-eval.measures.sel <- sort(c("p.pauc_0.9_correctFALSE.combined", 
+eval.measures.sel <- sort(c("pAUC.combined", 
                             "sensAtpVal005.combined", "regpValsProp.combined", 
-                            "p.pauc_0.9_correctFALSE.intersect",
+                            "pAUC.intersection",
                             "sensAtpVal005.intersect", "regpValsProp.intersect", 
-                            "p.pauc_0.9_correctFALSE.diaWorkflow", 
+                            "pAUC.diaWorkflow", 
                             "sensAtpVal005.diaWorkflow", "regpValsProp.diaWorkflow", 
                             "RMSEEcoli.diaWorkflow", "RMSEHuman.diaWorkflow", 
                             "RMSEEcoli.intersect", "RMSEHuman.intersect"))
@@ -1508,7 +1513,7 @@ ggsave(file=paste0("FigS15_charact_bootstrapDatasets_NoSROnly.svg"), ggplot.char
 sett <- "dia"
 sel <- c("bootstrap.dataset", "groupSize", settings)
 
-eval.measures <- c("p.pauc_0.9_correctFALSE.diaWorkflow", "p.pauc_0.9_correctFALSE.intersect", "p.pauc_0.9_correctFALSE.combined")
+eval.measures <- c("pAUC.diaWorkflow", "pAUC.intersection", "pAUC.combined")
 for (eval.measure in eval.measures){
   df.combined.eval <- df.combined[, c(sel, eval.measure)]
   
@@ -1581,7 +1586,7 @@ for (setting in settings){
         xlab("") +
         scale_alpha(guide = 'none') +
         guides(colour = guide_legend(override.aes = list(alpha = 0.5)))
-      ggsave(paste0("S18_bumpchart_", diaSpecification, "_", setting, "_", proteinList, ".svg"), bump.chart, width=width, height=5)
+      ggsave(paste0("FigS18_bumpchart_", diaSpecification, "_", setting, "_", proteinList, ".svg"), bump.chart, width=width, height=5)
       
     }
     
@@ -1596,7 +1601,7 @@ for (setting in settings){
       xlab("") +
       scale_alpha(guide = 'none') +
       guides(colour = guide_legend(override.aes = list(alpha = 0.5)))
-    ggsave(paste0("S18_bumpchart_", diaSpecification, "_", setting, "_meanOverproteinLists.svg"), bump.chart, width=width, height=5)
+    ggsave(paste0("FigS18_bumpchart_", diaSpecification, "_", setting, "_meanOverproteinLists.svg"), bump.chart, width=width, height=5)
   }
 }
 
