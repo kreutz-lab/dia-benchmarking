@@ -1,17 +1,16 @@
-## GitHub repository to publication "Benchmarking of Analysis Strategies for Data-Independent Acquisition Proteomics Using a Large-Scale Dataset Comprising Inter-Patient Heterogeneity"
+## "Benchmarking of Analysis Strategies for Data-Independent Acquisition Proteomics Using a Large-Scale Dataset Comprising Inter-Patient Heterogeneity"
 
-### File information
 
 ### Descriptive characterisation of the 17 benchmark datasets
 For the descriptive analysis of the original DIA datasets 
 diaWorkflowResults_allDilutions.rds was used, which included protein intensity information to all four spike-in conditions (human only, 1:25, 1:12, 1:6)
 
-#### Reference protein lists
+### Reference protein lists
 - 'Intersection' intersectProteinNames.rds
 - 'Combined' combinedProteinNames.rds
 - 'DiaWorkflow' was derived directly from sublist of respective dialects workflow in diaWorkflowResults.rds (which included only information to the spike-in conditions 1:25 and 1:12 and only includes proteins, for which intensities were measured in these two conditions) by extracting the row names.
 
-#### R scripts in the order of usage
+### R scripts in the order of usage
 - bootstrapping.R &rarr; Cleaning and unification of the data matrices of the investigated 17 DIA workflows, and generation of list of 2100 vectors of column indices, which were used to generate bootstrap datasets from the data matrices in diaWorkflowResults.rds.
 
 - benchmark_analysis.R &rarr; Running distinct sparsity reduction - normalization - statistical test
