@@ -1,4 +1,4 @@
-# dia-benchmarking
+# GitHub repository to publication "Benchmarking of Analysis Strategies for Data-Independent Acquisition Proteomics Using a Large-Scale Dataset Comprising Inter-Patient Heterogeneity"
 
 ## File information
 
