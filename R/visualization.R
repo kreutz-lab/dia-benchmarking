@@ -30,6 +30,8 @@ library(limma)
 library(foreach)
 library(doParallel)
 
+library(ggplotify)
+
 my_greens = brewer.pal(n = 9, "Greens")[3:9]
 
 # setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
@@ -149,32 +151,8 @@ formatMSTable.precursors <- function(x) {
   x
 }
 
-
 #diaWorkflowResults.precursors <- lapply(diaWorkflowResults.precursors, formatMSTable.precursors)
 diaWorkflowResults.precursors <- parallel::mclapply(diaWorkflowResults.precursors, formatMSTable.precursors, mc.cores = detectCores() - 1)
-
-
-# addLeadingZeros <- function(el){
-#   if (length(el) == 1){
-#     elFinal <- formatC(as.numeric(el),width=3,format='f',digits=0,flag='0')
-#   } else if (length(el) == 2){
-#     elZerosAdded <- formatC(as.numeric(el[2]),width=3,format='f',digits=0,flag='0')
-#     elFinal <- paste0(el[1], "_", elZerosAdded)
-#   }
-#   elFinal
-# }
-
-# for (dia in c("OSW_MaxQuant", "OSW_DIANN_AI_GPF", "OSW_MSFragger")){
-#   diaWorkflowResults.precursors[[dia]]$Sample <- 
-#     unlist(lapply( strsplit(
-#       unique(diaWorkflowResults.precursors[[dia]]$Sample),split='_', fixed=TRUE), addLeadingZeros))
-#   
-# }
-
-# diaWorkflowResults.precursors[["OSW_MaxQuant"]]$Sample <- unlist(lapply( strsplit(unique(diaWorkflowResults.precursors[["OSW_MaxQuant"]]$Sample),split='_', fixed=TRUE), addLeadingZeros))
-# diaWorkflowResults.precursors[["OSW_DIANN_AI_GPF"]]$Sample <- unlist(lapply( strsplit(unique(diaWorkflowResults.precursors[["OSW_DIANN_AI_GPF"]]$Sample),split='_', fixed=TRUE), addLeadingZeros))
-# diaWorkflowResults.precursors[["OSW_MSFragger"]]$Sample <- unlist(lapply( strsplit(unique(diaWorkflowResults.precursors[["OSW_MSFragger"]]$Sample),split='_', fixed=TRUE), addLeadingZeros))
-
 
 generateWideFormattedDf.precursors <- function(df) {
   # remove duplicates from multiple precursors carrying the same quantitative information for a certain protein
@@ -295,6 +273,7 @@ plotDIAWorkflowDistributions <- function(diaWorkflowResults, level=c("proteinLev
     axisLabel <- "# Precursors"
   }
   
+  write.csv(stacked.nonNA, paste0(fileprefix, "_ProteinNumbers_", level, ".csv"), row.names = FALSE)
   # FIGURE 2
   ggplot.intensity.violinBoxplot <- ggplot(stacked.nonNA,aes(forcats::fct_rev(dia), NumberProteins, fill=forcats::fct_rev(dilution))) +
     geom_boxplot(alpha=0.5, outlier.size=0.5) +
@@ -308,6 +287,9 @@ plotDIAWorkflowDistributions <- function(diaWorkflowResults, level=c("proteinLev
     guides(fill = guide_legend(reverse = TRUE)) 
   ggsave(file=paste0(fileprefix, "_ProteinNumbers_", level, ".svg"), ggplot.intensity.violinBoxplot, height=8, width=6)
   
+  write.csv(stacked.nonNA.speciesSeparated[stacked.nonNA.speciesSeparated$species=="E. coli",], 
+            paste0(fileprefix, "_ProteinNumbers_Ecoli_", level, ".csv"),
+            row.names = FALSE)
   ggplot.intensity.violinBoxplot.Ecoli <- ggplot(stacked.nonNA.speciesSeparated[stacked.nonNA.speciesSeparated$species=="E. coli",],aes(forcats::fct_rev(dia), NumberProteins, fill=forcats::fct_rev(dilution))) +
     geom_boxplot(alpha=0.5, outlier.size=0.5) +
     coord_flip() +
@@ -320,6 +302,9 @@ plotDIAWorkflowDistributions <- function(diaWorkflowResults, level=c("proteinLev
     guides(fill = guide_legend(reverse = TRUE)) 
   ggsave(file=paste0(fileprefix, "_ProteinNumbers_Ecoli_", level, ".svg"), ggplot.intensity.violinBoxplot.Ecoli, height=8, width=6)
   
+  write.csv(stacked.nonNA.speciesSeparated[stacked.nonNA.speciesSeparated$species=="Human",], 
+            paste0(fileprefix, "_ProteinNumbers_Human_", level, ".csv"), 
+            row.names = FALSE)
   ggplot.intensity.violinBoxplot.Human <- ggplot(stacked.nonNA.speciesSeparated[stacked.nonNA.speciesSeparated$species=="Human",],aes(forcats::fct_rev(dia), NumberProteins, fill=forcats::fct_rev(dilution))) +
     geom_boxplot(alpha=0.5, outlier.size=0.5) +
     coord_flip() +
@@ -332,7 +317,7 @@ plotDIAWorkflowDistributions <- function(diaWorkflowResults, level=c("proteinLev
     guides(fill = guide_legend(reverse = TRUE)) 
   ggsave(file=paste0(fileprefix, "_ProteinNumbers_Human_", level, ".svg"), ggplot.intensity.violinBoxplot.Human, height=8, width=6)
   
-  
+  #write.csv(stacked.df, paste0(fileprefix, "_intensityDistributions_", level, ".csv"), row.names = FALSE)
   ggplot.intensityFacet <- ggplot(stacked.df, aes(x = intensity, y=forcats::fct_rev(dia), fill=forcats::fct_rev(dilution))) + 
     ggridges::geom_density_ridges(alpha=0.5) +
     facet_grid(. ~ species) +
@@ -373,6 +358,9 @@ plotDIAWorkflowDistributions <- function(diaWorkflowResults, level=c("proteinLev
     group_by(!!as.name(colID), dilution, dia, diaSoftware, diaLibrary, species) %>% 
     dplyr::summarize(variance = var(intensity, na.rm = TRUE))
   
+  write.csv(stacked.df.var[stacked.df.var$species == "E. coli", ], 
+            paste0("proteinVariance_Ecoli_", level, ".csv"),
+            row.names = FALSE)
   ggplot.var <- ggplot(stacked.df.var[stacked.df.var$species == "E. coli", ], aes(x = log2(variance), 
                                                                                   y=forcats::fct_rev(dia), fill=forcats::fct_rev(dilution))) + 
     geom_boxplot(alpha=0.5, outlier.size=0.5) +
@@ -390,7 +378,8 @@ plotDIAWorkflowDistributions <- function(diaWorkflowResults, level=c("proteinLev
   ggplot.var.mins15 <- ggplot.var + xlim(-15, NA) 
   ggsave(file=paste0(fileprefix, "_proteinVariance_Ecoli_xlimMinus15_", level, ".svg"), ggplot.var.mins15, height=8, width=6)
   
-  
+  write.csv(stacked.df.var[stacked.df.var$species == "Human", ], 
+            paste0("proteinVariance_Human_", level, ".csv"), row.names = FALSE)
   ggplot.var.human <- ggplot(stacked.df.var[stacked.df.var$species == "Human", ], aes(x = log2(variance), 
                                                                                       y=forcats::fct_rev(dia), fill=forcats::fct_rev(dilution))) + 
     geom_boxplot(alpha=0.5, outlier.size=0.5) +
@@ -409,7 +398,7 @@ plotDIAWorkflowDistributions <- function(diaWorkflowResults, level=c("proteinLev
 }
 ########################################################################
 
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 diaWorkflowResults <- readRDS(file = "diaWorkflowResults_allDilutions.rds")
 
@@ -423,7 +412,6 @@ diaWorkflowResults <- diaWorkflowResults[order(names(diaWorkflowResults))]
 for (diaworkflow.name in names(diaWorkflowResults)){
   addToExcelWb(paste0("diaWorkflowResults_allDilutions.xlsx"), diaWorkflowResults[[diaworkflow.name]], strtrim(diaworkflow.name, 31), rowNames = TRUE)
 }
-
 
 # Remove data of sample 1-6_028 due to too many missing values
 diaWorkflowResults <- lapply(diaWorkflowResults, function(x){
@@ -555,6 +543,9 @@ plotMeanCorrelations <- function(diaWorkflowResults, level="", prefix="") {
     df <- addSoftwareLibraryColumns(df, sepSpace = TRUE) 
     
     # FIGURE 3A
+    write.csv(df[, c("proteinName", "percNAsInProtein", "proteinMeans", "species", "diaSoftware", "diaLibrary")], 
+              paste0(prefix, "A_proteinMeansNACorrelation_", gsub(" |\\.", "_", species), "_", level, ".csv"), 
+              row.names = FALSE)
     pdf(file=paste0(prefix, "A_proteinMeansNACorrelation_", gsub(" |\\.", "_", species), "_", level, ".pdf"), width=8, height=6)
     if (level=="precursorLevel"){
       ylab.name <- "Precursor mean"
@@ -604,6 +595,9 @@ plotMeanCorrelations <- function(diaWorkflowResults, level="", prefix="") {
     
     pdf(file=paste0(prefix, "B_sampleMeansNACorrelation_", gsub(" |\\.", "_", species), "_", level, ".pdf"), width=8, height=6)
     # FIGURE 3B
+    write.csv(df2[, c("sampleName", "percNAsInSample", "sampleMeans", "dilution", "diaSoftware", "diaLibrary")], 
+              paste0(prefix, "B_sampleMeansNACorrelation_", gsub(" |\\.", "_", species), "_", level, ".csv"), 
+              row.names = FALSE)
     print(ggplot(df2, aes(x = percNAsInSample, y = sampleMeans, color=forcats::fct_rev(dilution))) + 
             geom_point(size=0.9, alpha=0.5, stroke = 0.1) +
             facet_grid(diaSoftware ~ diaLibrary,  scales = "free") +
@@ -631,8 +625,11 @@ proteinMeansNAs.tric.combined <- do.call("rbind", list(proteinMeansNAs.tric001,
 proteinMeansNAs.tric.combined$species <- "Human"
 proteinMeansNAs.tric.combined[grepl("_ECOLI", proteinMeansNAs.tric.combined$proteinName),]$species <- "E. coli"
 
-svg(file=paste0("FigS6_TRIC_comparison_OSWMaxQuant.svg"), width=10, height=5)
 # FIGURE 3B
+write.csv(proteinMeansNAs.tric.combined, 
+          paste0("FigS6_TRIC_comparison_OSWMaxQuant.csv"), 
+          row.names = FALSE)
+svg(file=paste0("FigS6_TRIC_comparison_OSWMaxQuant.svg"), width=10, height=5)
 print(ggplot(data = proteinMeansNAs.tric.combined, aes(x = percNAsInProtein, y = proteinMeans, color=forcats::fct_rev(species))) +
         geom_point(alpha=.1) +
         scale_color_manual(values=c(brewer.pal(11, "RdYlBu")[10], brewer.pal(11, "RdYlBu")[2])) +
@@ -670,6 +667,9 @@ densMode <- function(x){
 df.ecoli.mode <- ddply(df.ecoli,"dia", mutate, val_mean = signif(densMode(log2FC)$x,3), med.x = signif(densMode(log2FC)$x,3), med.y=signif(densMode(log2FC)$y,3)*1.1)
 
 # SUPPLEMENTARY FIGURE S12
+write.csv(subset(df.ecoli.mode, select = -dia), 
+          paste0("FigS12_FC_ecoli.csv"), 
+          row.names = FALSE)
 svg(file="FigS12_FC_ecoli.svg", width=12, height=8)
 ggplot(data=df.ecoli.mode, aes(x=log2FC)) + 
   geom_density() + 
@@ -762,6 +762,21 @@ getCombinedIntensitiesPerDIAWorkflow <- function(diaWorkflowResults, humanOrEcol
                                                levels = c("PROSIT EDIA GPF", "DIANN AI GPF", "MaxQuant", "MSFragger", "Predicted" ))
   
   #intensitiesPerDIAWorkflow.df <- addSoftwareLibraryColumns(intensitiesPerDIAWorkflow.df, sepSpace = TRUE)
+  
+  # The number of samples per condition is 23, except for spike-in condition 1:6 where it is 22
+  # This the average number of non-NA values per sample is calculated for 1:6 spike-in condition
+  # by dividing through 22, while for all other spike-in condition by dividing through 23
+  averagedNonNACounts <- intensitiesPerDIAWorkflow.df %>% 
+    dplyr::group_by(diaSoftware, diaLibrary, dilution) %>% 
+    dplyr::summarize(
+      count1to6 = round(sum(!is.na(intensity[dilution == "Lymph nodes + 1:6 E.coli"]))/22, digits = 2), 
+      countNon1to6 = round(sum(!is.na(intensity[dilution != "Lymph nodes + 1:6 E.coli"]))/23, digits = 2)
+    ) %>% 
+    dplyr::mutate(AverageNumNonNAsPerSample = count1to6 + countNon1to6)  %>% 
+    select (-c(count1to6, countNon1to6))
+  
+  intensitiesPerDIAWorkflow.df <- left_join(intensitiesPerDIAWorkflow.df, averagedNonNACounts, by = c("diaSoftware", "diaLibrary", "dilution"))
+  
   intensitiesPerDIAWorkflow.df
 }
 
@@ -775,45 +790,25 @@ getProteinMeansIntensitiesPerDIAWorkflow <- function(diaWorkflowResults, humanOr
   proteinMeansPerDIAWorkflow.df
 }
 
-give.AverageNumNonNAsPerSample <- function(x){
-  return(c(y = max(x)*1.07, label = round(sum(!is.na(x))/23, digits = 2)))  # 23 is the number of samples per dilution
+adjustNumberPosition <- function(x){
+  return(c(y = max(x)*1.07))  # 23 is the number of samples per dilution
 }
 
 plotIntensityViolinplotsInGrid <- function(diaWorkflowResults, level=c("proteinLevel", "precursorLevel"), fileprefix="") {
   comInt.Ecoli <- getCombinedIntensitiesPerDIAWorkflow(diaWorkflowResults, humanOrEcoli="ECOLI")
   comInt.Human <- getCombinedIntensitiesPerDIAWorkflow(diaWorkflowResults, humanOrEcoli="HUMAN")
-  #comInt.EcoliAndHuman <- getCombinedIntensitiesPerDIAWorkflow(diaWorkflowResults, humanOrEcoli="")
   
-  #protMeanInt.Ecoli <- getProteinMeansIntensitiesPerDIAWorkflow(diaWorkflowResults, humanOrEcoli="ECOLI")
-  #protMeanInt.Human <- getProteinMeansIntensitiesPerDIAWorkflow(diaWorkflowResults, humanOrEcoli="HUMAN")
-  #protMeanInt.EcoliAndHuman <- getProteinMeansIntensitiesPerDIAWorkflow(diaWorkflowResults, humanOrEcoli="")
-  
-  # pdf(file="diaWorkflowLinePlot_protMeanInt.Ecoli.pdf", width=10, height=8)
-  # ggplot(protMeanInt.Ecoli, aes(x = dilution, y = intensity)) + 
-  #   geom_line(aes(x = dilution, y = intensity, group=proteinnames), alpha=0.2, size=0.05) +
-  #   facet_grid(diaSoftware ~ diaLibrary, scales = "fixed") +
-  #   xlab("") +
-  #   ylab("Log2(Intensity)") + 
-  #   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  #   ggtitle("E.coli")
-  # dev.off()
-  # 
-  # pdf(file="diaWorkflowLinePlot_protMeanInt.Human.pdf", width=10, height=8)
-  # ggplot(protMeanInt.Human, aes(x = dilution, y = intensity)) + 
-  #   geom_line(aes(x = dilution, y = intensity, group=proteinnames), alpha=0.2, size=0.05) +
-  #   facet_grid(diaSoftware ~ diaLibrary, scales = "fixed") + 
-  #   xlab("") +
-  #   ylab("Log2(Intensity)") + 
-  #   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  #   ggtitle("Human")
-  # dev.off()
-  
+ 
   # SUPPLEMENTARY FIGURE S4
+  write.csv(comInt.Ecoli, 
+            paste0(fileprefix, "_intensityViolinplots_forEachdiaWorkflow_Ecoli_", level,".csv"), 
+            row.names = FALSE)
   pdf(file=paste0(fileprefix, "_intensityViolinplots_forEachdiaWorkflow_Ecoli_", level,".pdf"), width = 10, height = 8)
   print(ggplot(comInt.Ecoli, aes(x = dilution, y = intensity)) + 
     geom_violin(scale="count") +
     geom_boxplot(width=0.08, outlier.size=0.5, outlier.alpha=0.4) +
-    stat_summary(fun.data = give.AverageNumNonNAsPerSample, geom = "text", fun = max, size=2) +
+    stat_summary(geom="text", aes(label=AverageNumNonNAsPerSample), 
+                   size=2, fun.data = adjustNumberPosition) +
     facet_grid(diaSoftware ~ diaLibrary, scales = "fixed") + 
     xlab("") +
     ylab("Log2(Intensity)") + 
@@ -822,11 +817,16 @@ plotIntensityViolinplotsInGrid <- function(diaWorkflowResults, level=c("proteinL
     ggtitle(paste0("E.coli, ", level)))
   dev.off()
   
+  
+  write.csv(comInt.Human, 
+            paste0("FigS5_intensityViolinplots_forEachdiaWorkflow_human_", level, ".csv"), 
+            row.names = FALSE)
   pdf(file=paste0("FigS5_intensityViolinplots_forEachdiaWorkflow_human_", level, ".pdf"), width=10, height=8)
   print(ggplot(comInt.Human, aes(x = dilution, y = intensity)) + 
     geom_violin(scale="count") +
     geom_boxplot(width=0.08, outlier.size=0.5, outlier.alpha=0.4) +
-    stat_summary(fun.data = give.AverageNumNonNAsPerSample, geom = "text", fun = max, size=2) +
+      stat_summary(geom="text", aes(label=AverageNumNonNAsPerSample), 
+                   size=2, fun.data = adjustNumberPosition) +
     facet_grid(diaSoftware ~ diaLibrary, scales = "fixed") + 
     xlab("") +
     ylab("Log2(Intensity)") + 
@@ -842,52 +842,52 @@ plotIntensityViolinplotsInGrid(diaWorkflowResults, level="proteinLevel", filepre
 
 ############################################################
 
-getDfModel <- function(modus, df) {
-  if (modus == "unnormalized"){
-    df.model <- df
-  } else if (modus == "TRQN") {
-    mtx <- as.matrix(df)
-    df.trqn <- MBQN::mbqn(mtx, FUN = mean)
-    row.names(df.trqn) <- row.names(df)
-    df.model <- as.data.frame(df.trqn)
-  } else if (modus == "QN"){
-    mtx <- as.matrix(df)
-    df.qn <- MBQN::mbqn(mtx, FUN = NULL)
-    row.names(df.qn) <- row.names(df)
-    df.model <- as.data.frame(df.qn)
-  }else if  (modus == "median"){
-    mtx <- as.matrix(df)
-    df.median <- limma::normalizeMedianValues(mtx)
-    df.model <- as.data.frame(df.median)
-  } else {
-    print("Undefined modus")
-  }
-  return(df.model)
-}
-
-pdf(paste0("boxplotSpeciesSeparated.pdf"))
-for (i in 1:length(diaWorkflowResults)) {
-  dia.name <- names(diaWorkflowResults)[i]
-  df <- diaWorkflowResults[[i]]
-  df <- df[,grepl("1-25|1-12", colnames(df))]
-  
-  normalizations <- c("unnormalized", "TRQN", "QN", "median")
-  
-  for (normalization in normalizations){
-    df.norm <- getDfModel(normalization, df)
-    df.norm$species <- "Human"
-    df.norm[grepl("_ECOLI", row.names(df.norm)),]$species <- "E. coli"
-    df.norm.long <- reshape2::melt(df.norm)
-    print(ggplot(df.norm.long, aes(x=value, y=forcats::fct_rev(variable), fill=species)) + 
-            geom_boxplot() +
-            geom_vline(aes(xintercept = median(value, na.rm = TRUE)), colour = 'red') +
-            xlab("Log2(Intensity)") +
-            ylab("DIA Workflow") +
-            theme(legend.title = element_blank())+
-            ggtitle(paste0(dia.name, ", ", normalization)))
-  }
-}
-dev.off()
+# getDfModel <- function(modus, df) {
+#   if (modus == "unnormalized"){
+#     df.model <- df
+#   } else if (modus == "TRQN") {
+#     mtx <- as.matrix(df)
+#     df.trqn <- MBQN::mbqn(mtx, FUN = mean)
+#     row.names(df.trqn) <- row.names(df)
+#     df.model <- as.data.frame(df.trqn)
+#   } else if (modus == "QN"){
+#     mtx <- as.matrix(df)
+#     df.qn <- MBQN::mbqn(mtx, FUN = NULL)
+#     row.names(df.qn) <- row.names(df)
+#     df.model <- as.data.frame(df.qn)
+#   }else if  (modus == "median"){
+#     mtx <- as.matrix(df)
+#     df.median <- limma::normalizeMedianValues(mtx)
+#     df.model <- as.data.frame(df.median)
+#   } else {
+#     print("Undefined modus")
+#   }
+#   return(df.model)
+# }
+# 
+# pdf(paste0("boxplotSpeciesSeparated.pdf"))
+# for (i in 1:length(diaWorkflowResults)) {
+#   dia.name <- names(diaWorkflowResults)[i]
+#   df <- diaWorkflowResults[[i]]
+#   df <- df[,grepl("1-25|1-12", colnames(df))]
+#   
+#   normalizations <- c("unnormalized", "TRQN", "QN", "median")
+#   
+#   for (normalization in normalizations){
+#     df.norm <- getDfModel(normalization, df)
+#     df.norm$species <- "Human"
+#     df.norm[grepl("_ECOLI", row.names(df.norm)),]$species <- "E. coli"
+#     df.norm.long <- reshape2::melt(df.norm)
+#     print(ggplot(df.norm.long, aes(x=value, y=forcats::fct_rev(variable), fill=species)) + 
+#             geom_boxplot() +
+#             geom_vline(aes(xintercept = median(value, na.rm = TRUE)), colour = 'red') +
+#             xlab("Log2(Intensity)") +
+#             ylab("DIA Workflow") +
+#             theme(legend.title = element_blank())+
+#             ggtitle(paste0(dia.name, ", ", normalization)))
+#   }
+# }
+# dev.off()
 
 
 combinedProteinNames <- c()
@@ -942,7 +942,9 @@ colnames(diaWorkflowResults.intersect.df) <- names(diaWorkflowResults.intersect)
 
 
 M <- cor(diaWorkflowResults.intersect.df, use="pairwise.complete.obs") # "pairwise.complete.obs" as there are NAs in regVals for some dias
-
+write.csv(M, 
+          paste0("FigS2_corrplot_log2Intensities_diaworkflows.csv"),
+          row.names = TRUE)
 svg(file = paste0("FigS2_corrplot_log2Intensities_diaworkflows.svg"), width = 16, height = 16)
 corrplot::corrplot.mixed(M,  upper = "ellipse", lower = "number",
                          tl.pos = "lt", tl.col = "black", mar=c(0,0,2,0))
@@ -984,6 +986,11 @@ plotUpsetPlot <- function(diaWorkflowResults, selectedDilutions=c("Lymph nodes",
     } else if (intersectionType == "E.coli & Human"){
       protein.names <- diaWorkflowResults.names
     }
+    
+    df.protein.names <- data.frame(lapply(protein.names, function(x) x[1: max(sapply(protein.names, length))]) %>% do.call(cbind, .) )
+    write.csv(df.protein.names, 
+              paste0("FigS10AndS11_upsetPlot_", gsub(" ", "", intersectionType), "_noHEKIncluded_", str, ".csv"),
+              row.names = FALSE)
     
     svg(paste0("FigS10AndS11_upsetPlot_", gsub(" ", "", intersectionType), "_noHEKIncluded_", str, ".svg"), width=10, height=8)
     print(UpSetR::upset(UpSetR::fromList(protein.names),
@@ -1174,7 +1181,7 @@ df$dia <- row.names(df)
 df <- df[,c(ncol(df),1:(ncol(df)-1))]
 
 # Part of this table is depicted in SUPPLEMENTARY FIGURE S4 AND S5
-write.csv(df, file = "numberOfProteinsIntersectCombined.csv", row.names = FALSE)
+write.csv(df, file = "FigS10AndS11_numberOfProteinsIntersectCombined.csv", row.names = FALSE)
 
 
 #####################################################################################################################
@@ -1183,7 +1190,7 @@ write.csv(df, file = "numberOfProteinsIntersectCombined.csv", row.names = FALSE)
 
 # READ IN FILES AND FORMAT RESULT DATA FRAME
 theme_set(theme_minimal())
-setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 listfiles <- list.files(path = "20210125_CSVs", full.names = TRUE, pattern = "*.csv") 
 
@@ -1241,12 +1248,15 @@ df.combined <- df.combined[, c("bootstrap.dataset", "dia", "normalization", "spa
                                "groupSize", "medianSampleVariance", "medianProteinVariance", 
                                "percNATotal",  "kurtosis.wNAs", "skewness.wNAs", 
                                "var.groups.ratio.wNAs", "prctPC1.woNAs", "prctPC2.woNAs", "portionPC2PC1.woNAs", "pAUC.combined",
-                               "sensAtpVal005.combined", "regpValsProp.combined", "pAUC.intersect",  
+                               "sensAtpVal005.combined", "regpValsProp.combined", "pAUC.intersection",  
                                "sensAtpVal005.intersect", "regpValsProp.intersect", "pAUC.diaWorkflow", 
                                "sensAtpVal005.diaWorkflow", "regpValsProp.diaWorkflow", 
                                "RMSEEcoli.intersect", "RMSEHuman.intersect", "RMSEHumanAndEcoli.intersect",
                                "RMSEEcoli.diaWorkflow", "RMSEHuman.diaWorkflow", "RMSEHumanAndEcoli.diaWorkflow",
                                "portionUniqueSamples")]
+
+write.csv(df.combined, "BootstrapAnalysisResults_minimal.csv", row.names = FALSE)
+saveRDS(df.combined, "BootstrapAnalysisResults_minimal.rds")
 
 eval.measure <- "pAUC.diaWorkflow"
 
@@ -1258,8 +1268,8 @@ selectedGroupSizes <- c(3, 6, 13, 23)
 for (selectedGroupSize in selectedGroupSizes){
   for (selectedSR in unique(df.combined$sparsityReduction)){
     
-    df.combined1 <- df.combined[df.combined$sparsityReduction == selectedSR & df.combined$groupSize==selectedGroupSize,]
     
+    df.combined1 <- df.combined[df.combined$sparsityReduction == selectedSR & df.combined$groupSize==selectedGroupSize,]
     plots <- df.combined1 %>% dplyr::group_by(df.combined1$dia) %>%
       do(
         plots = ggplot(data = .) + aes(x=portionUniqueSamples, y=pAUC.diaWorkflow, color=statTest) +
@@ -1270,44 +1280,13 @@ for (selectedGroupSize in selectedGroupSizes){
           ylim(0, maxpAUC)
       )
     
-    pdf(file=paste0("FigS19_correlation_portionUniqueSamples_pAUC_", selectedSR, "only_groupSize", selectedGroupSize, ".pdf"))
+    pdf(file=paste0("FigS20_correlation_portionUniqueSamples_pAUC_", selectedSR, "only_groupSize", selectedGroupSize, ".pdf"))
     for (plot in plots$plots){
       print(plot)
     }
     dev.off()
   }
 }
-########################################################################
-# library("scattermore")
-# plot(df.combined$RMSEEcoli.diaWorkflow, df.combined$RMSEHuman.diaWorkflow)
-# 
-# df.combined.LibSoftware <- addSoftwareLibraryColumns(df.combined, sepSpace=TRUE)
-# 
-# print(ggplot(df.combined.LibSoftware, aes(x=RMSEHumanAndEcoli.diaWorkflow, y=pAUC.diaWorkflow, col=diaSoftware)) +
-#         geom_scattermore(alpha=0.01)+
-#         theme(legend.title = element_blank()) +
-#         guides(colour = guide_legend(override.aes = list(alpha = 1))))
-# 
-# 
-# 
-# 
-# pdf(file=paste0("S_correlation_RMSE_pAUC90_2.pdf"))
-# print(ggplot(df.combined.LibSoftware, aes(x=RMSEHumanAndEcoli.diaWorkflow, y=pAUC.diaWorkflow, col=sparsityReduction)) +
-#         geom_point(alpha=0.05, pch='.') + 
-#         theme(legend.title = element_blank()) +
-#         facet_grid(diaSoftware ~ diaLibrary, scales = "fixed") +
-#         guides(colour = guide_legend(override.aes = list(alpha = 1))))
-# dev.off()
-# 
-# for (setting in setdiff(settings, "dia")) {
-#   pdf(file=paste0("S_correlation_RMSE_pAUC90_", setting, ".pdf"), height = 10, width = 10)
-#   print(ggplot(df.combined.LibSoftware, aes(x=RMSEHumanAndEcoli.diaWorkflow, y=pAUC.diaWorkflow, col=.data[[setting]])) +
-#           geom_point(alpha=0.02, pch='.') + 
-#           theme(legend.title = element_blank()) +
-#           facet_grid(diaSoftware ~ diaLibrary, scales = "fixed") +
-#           guides(colour = guide_legend(override.aes = list(alpha = 1))))
-#   dev.off() 
-# }
 
 ########################################################################
 # Performance without separation by settings
@@ -1395,15 +1374,15 @@ df.combined.LibSoftware <- addSoftwareLibraryColumns(df.combined.LibSoftware, se
 
 df.combined.LibSoftware.NoSROnly <- df.combined.LibSoftware[df.combined.LibSoftware$sparsityReduction=="NoSR",]
 
-# SUPPLEMENTARY FIGURE S6
+# SUPPLEMENTARY FIGURE S13
 getViolinGrid("normalization","pAUC.diaWorkflow", df.combined.LibSoftware.NoSROnly, str="FigS13_normalization_violin_NoSROnly_")
 
-# SUPPLEMENTARY FIGURE S7
+# SUPPLEMENTARY FIGURE S14
 getViolinGrid("statTest","pAUC.diaWorkflow", df.combined.LibSoftware.NoSROnly, str="FigS14_statTest_violin_NoSROnly_")
 
 df.combined.LibSoftware.NoSROnly$groupSize <- as.numeric(as.character(df.combined.LibSoftware.NoSROnly$groupSize))
 
-# SUPPLEMENTARY FIGURE S17
+# SUPPLEMENTARY FIGURE S18
 for (eval.measure2 in c("pAUC.diaWorkflow", 
                         "pAUC.intersection", 
                         "pAUC.combined",
@@ -1424,7 +1403,7 @@ for (eval.measure2 in c("pAUC.diaWorkflow",
   if (grepl("sensAtpVal005.", eval.measure2)){
     ggplot.medianLine.groupSize.statTest <- ggplot.medianLine.groupSize.statTest + geom_hline(aes(yintercept = 0.8), colour = 'blue')
   }
-  ggsave(paste0("FigS17_ggplot_medianLine_groupSize_NoSROnly_", eval.measure2, ".svg"), ggplot.medianLine.groupSize.statTest, height = 8, width = 10)
+  ggsave(paste0("FigS18_ggplot_medianLine_groupSize_NoSROnly_", eval.measure2, ".svg"), ggplot.medianLine.groupSize.statTest, height = 8, width = 10)
 }
 
 df.combined.LibSoftware.selected <- df.combined.LibSoftware[, c("dia",
@@ -1486,11 +1465,68 @@ for (dia in sort(unique(df.combined.pairsplotsel$dia))){
   
   M <- cor(df.combined.pairsplotsel.dia, use="pairwise.complete.obs") # "pairwise.complete.obs" as there are NAs in regVals for some dias
   
+  write.csv(M, paste0("FigS16_corrplot_charact_NoSR_", dia, ".csv"), row.names = TRUE)
   svg(file = paste0("FigS16_corrplot_charact_NoSR_", dia, ".svg"), width = 15, height = 15)
   corrplot::corrplot.mixed(M,  upper = "ellipse", lower = "number",
                  tl.pos = "lt", tl.col = "black", main=dia, mar=c(0,0,2,0))
   dev.off()
 }
+
+
+
+#plotCorrplotGrid <- function(df.combined.pairsplotsel, filename) {
+  corrplot.lst <- list()
+
+  for(dia in unique(df.combined.pairsplotsel$dia)){
+      print(dia)
+      df.plot.dia <- df.combined.pairsplotsel[df.combined.pairsplotsel$dia==dia,]
+      df.plot.dia$dia <- NULL
+      #df.combined.pairsplotsel.dia=df.combined.pairsplotsel.dia[,order(ncol(df.combined.pairsplotsel.dia):1)]
+      
+      M <- cor(df.plot.dia, use="pairwise.complete.obs") # "pairwise.complete.obs" as there are NAs in regVals for some dias
+
+      gg <- ggplotify::as.ggplot(~corrplot(M, method = 'color', tl.pos='n', cl.pos='n', mar = c(2, 2, 2, 2)))
+      corrplot.lst <- list.append(corrplot.lst, gg)
+  }
+  names(corrplot.lst) <- gsub(" ", "_", unique(df.combined.pairsplotsel$dia))
+  
+  
+  grobArranged <- gridExtra::arrangeGrob(corrplot.lst[["DIANN_PROSIT_EDIA_GPF"]]+ theme(legend.position="none"), 
+                                         corrplot.lst[["DIANN_DIANN_AI_GPF"]]+ theme(legend.position="none"), 
+                                         corrplot.lst[["DIANN_MaxQuant"]]+ theme(legend.position="none"),
+                                         corrplot.lst[["DIANN_MSFragger"]]+ theme(legend.position="none"), 
+                                         corrplot.lst[["DIANN_Predicted"]]+ theme(legend.position="none"),
+                                         corrplot.lst[["Skyline_PROSIT_EDIA_GPF"]]+ theme(legend.position="none"), 
+                                         corrplot.lst[["Skyline_DIANN_AI_GPF"]]+ theme(legend.position="none"), 
+                                         corrplot.lst[["Skyline_MaxQuant"]]+ theme(legend.position="none"),
+                                         corrplot.lst[["Skyline_MSFragger"]] + theme(legend.position="none"), 
+                                         patchwork::plot_spacer() + theme_minimal(), 
+                                         patchwork::plot_spacer() + theme_minimal(),
+                                         corrplot.lst[["OSW_DIANN_AI_GPF"]] + theme(legend.position="none"), 
+                                         corrplot.lst[["OSW_MaxQuant"]] + theme(legend.position="none"), 
+                                         corrplot.lst[["OSW_MSFragger"]] + theme(legend.position="none"), 
+                                         patchwork::plot_spacer() + theme_minimal(),
+                                         corrplot.lst[["Spectronaut_PROSIT_EDIA_GPF"]] + theme(legend.position="none"), 
+                                         corrplot.lst[["Spectronaut_DIANN_AI_GPF"]] + theme(legend.position="none"), 
+                                         corrplot.lst[["Spectronaut_MaxQuant"]] + theme(legend.position="none"),
+                                         corrplot.lst[["Spectronaut_MSFragger"]] + theme(legend.position="none"), 
+                                         corrplot.lst[["Spectronaut_Predicted"]] + theme(legend.position="none"), 
+                                         nrow=4)
+  
+  
+  g <- grid.arrange(rbind(tableGrob(t(c("PROSIT EDIA GPF", "DIANN AI GPF", "MaxQuant", "MSFragger", "Predicted")), theme = ttheme_minimal(), rows = ""), 
+                          cbind(tableGrob(c("DIANN", "Skyline", "OSW", "Spectronaut"), theme = ttheme_minimal()), 
+                                grobArranged,  size = "last"), size = "last"), 
+                    nrow=1, heights=c(10))
+  
+  ggsave(file=filename="FigS17_corrplot_charact_NoSR_facetGrid.svg", g, width=15, height=13)
+#}
+
+#plotCorrplotGrid(df.combined.pairsplotsel, filename="FigS17_corrplot_charact_NoSR_facetGrid.svg")
+
+
+
+
 
 df.combined.pairsplotsel.long <- reshape2::melt(df.combined.pairsplotsel[, c("dia", setdiff(data.characteristics.sel, "groupSize"))])
 df.combined.pairsplotsel.long <- addSoftwareLibraryColumns(df.combined.pairsplotsel.long, sepSpace = TRUE)
@@ -1527,8 +1563,10 @@ for (eval.measure in eval.measures){
   
   M <- cor(df.combined.eval.wide, use="pairwise.complete.obs")
   
+  write.csv(M, paste0("corrplot_", sett, "_",eval.measure,".csv"), row.names = TRUE)
+  
   # SUPPLEMENTARY FIGURE S8
-  svg(file = paste0("FigS8_corrplot_", sett, "_",eval.measure,".svg"), width = 15, height = 15)
+  svg(file = paste0("corrplot_", sett, "_",eval.measure,".svg"), width = 15, height = 15)
   corrplot.mixed(M,  upper = "ellipse", lower = "number",
                  tl.pos = "lt", tl.col = "black")
   dev.off()
@@ -1547,12 +1585,12 @@ for (eval.measure in eval.measures){
 ########################################################################
 # Ranking
 
-df.combined2 <- df.combined
-df.combined2 <- addSoftwareLibraryColumns(df.combined2, sepSpace = TRUE)
+
+df.combined2 <- addSoftwareLibraryColumns(df.combined, sepSpace = TRUE)
 
 diaSpecifications <- c("dia", "diaSoftware", "diaLibrary")
 settings <- c("statTest", "sparsityReduction", "normalization")
-proteinLists <- c("diaWorkflow", "intersect", "combined")
+proteinLists <- c("diaWorkflow", "intersection", "combined")
 
 for (setting in settings){
   for (diaSpecification in diaSpecifications){
@@ -1560,7 +1598,7 @@ for (setting in settings){
     for (proteinList in proteinLists) {
       ranks.df <- df.combined2 %>% 
         dplyr::group_by(bootstrap.dataset, !!as.name(setting), dia, diaSoftware, diaLibrary) %>% 
-        dplyr::summarise(mean.pAUC = mean(!!as.name(paste0("p.pauc_0.9_correctFALSE.", proteinList)))) %>% 
+        dplyr::summarise(mean.pAUC = mean(!!as.name(paste0("pAUC.", proteinList)))) %>% 
         dplyr::group_by(bootstrap.dataset, dia) %>%
         dplyr::mutate(ranking = rank(- mean.pAUC)) %>% 
         dplyr::group_by(!!as.name(setting), !!as.name(diaSpecification)) %>% 
@@ -1576,6 +1614,9 @@ for (setting in settings){
         width = 7
       }
       
+      write.csv(ranks.df,
+                paste0("FigS19_bumpchart_", diaSpecification, "_", setting, "_", proteinList, ".csv"),
+                row.names = FALSE)
       bump.chart <- ggplot(data = ranks.df, aes(x = get(setting), y = mean.ranking, group = get(diaSpecification), alpha=0.5)) +
         geom_line(aes(color = get(diaSpecification)), size = 1) +
         geom_point(aes(color = get(diaSpecification)), size = 2) +
@@ -1586,11 +1627,14 @@ for (setting in settings){
         xlab("") +
         scale_alpha(guide = 'none') +
         guides(colour = guide_legend(override.aes = list(alpha = 0.5)))
-      ggsave(paste0("FigS18_bumpchart_", diaSpecification, "_", setting, "_", proteinList, ".svg"), bump.chart, width=width, height=5)
+      ggsave(paste0("FigS19_bumpchart_", diaSpecification, "_", setting, "_", proteinList, ".svg"), bump.chart, width=width, height=5)
       
     }
     
     meanOverProteinLists.df <- data.frame(bump.lst[[1]][,1:2], mean.mean.ranking=rowMeans(data.frame(bump.lst[[1]][,"mean.ranking"], bump.lst[[2]][,"mean.ranking"], bump.lst[[3]][,"mean.ranking"])))
+    write.csv(meanOverProteinLists.df,
+              paste0("FigS19_bumpchart_", diaSpecification, "_", setting, "_meanOverproteinLists.csv"),
+              row.names = FALSE)
     bump.chart <- ggplot(data = meanOverProteinLists.df, aes(x = get(setting), y = mean.mean.ranking, group = get(diaSpecification), alpha=0.5)) +
       geom_line(aes(color = get(diaSpecification)), size = 1) +
       geom_point(aes(color = get(diaSpecification)), size = 2) +
@@ -1601,7 +1645,7 @@ for (setting in settings){
       xlab("") +
       scale_alpha(guide = 'none') +
       guides(colour = guide_legend(override.aes = list(alpha = 0.5)))
-    ggsave(paste0("FigS18_bumpchart_", diaSpecification, "_", setting, "_meanOverproteinLists.svg"), bump.chart, width=width, height=5)
+    ggsave(paste0("FigS19_bumpchart_", diaSpecification, "_", setting, "_meanOverproteinLists.svg"), bump.chart, width=width, height=5)
   }
 }
 
